@@ -1,0 +1,36 @@
+name:                lxd-client
+version:             0.1.0.0
+synopsis:            LXD REST API Client for Haskell
+description:
+    Implementation of a REST API client of LXD in Haskell.
+homepage:            https://github.com/hverr/haskell-lxd-client#readme
+license:             GPL-3
+license-file:        LICENSE
+author:              Henri Verroken
+maintainer:          henriverroken@gmail.com
+copyright:           2017 Henri Verroken
+category:            System
+build-type:          Simple
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Lib
+  build-depends:       base >= 4.7 && < 5
+  ghc-options:         -Wall
+  default-extensions:  OverloadedStrings
+  default-language:    Haskell2010
+
+test-suite lxd-client-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  build-depends:       base
+                     , lxd-client
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-extensions:  OverloadedStrings
+  default-language:    Haskell2010
+
+source-repository head
+  type:     git
+  location: https://github.com/hverr/haskell-lxd-client

@@ -1,0 +1,6 @@
+# Vim
+.*.sw[a-z]
+
+# Haksell
+.stack-work
+dist
