@@ -1,18 +1,30 @@
-import Network.Connection (TLSSettings(..))
-import Network.HTTP.Client (newManager)
-import Network.HTTP.Client.TLS (mkManagerSettings)
-import Servant.Client
+module Main where
+
+import Control.Monad.Trans.Either (EitherT(..))
+
+import Data.Default (def)
+import Data.Either.Combinators (mapBoth)
+
+import Servant.Client (runClientM)
 
 import Network.LXD.Client
 
 main :: IO ()
-main = do
-    manager <- newManager managerSettings
-    res <- runClientM apiConfig (ClientEnv manager baseUrl)
+main =
+    test "connectToRemote" connectToRemote
+
+test :: Show a => String -> EitherT String IO a -> IO ()
+test name action = do
+    putStrLn $ "Testing " ++ name
+    res <- runEitherT action
     case res of
-        Left err -> putStrLn $ "Error: " ++ show err
-        Right sup -> print sup
+        Left err -> putStrLn $ "    error:   " ++ show err
+        Right v  -> putStrLn $ "    success: " ++ show v
+
+connectToRemote :: EitherT String IO String
+connectToRemote = do
+    client <- remoteHostClient host
+    EitherT (mapBoth show show <$> runClientM apiConfig client)
   where
-    managerSettings = mkManagerSettings tlsSettings Nothing
-    tlsSettings = TLSSettingsSimple True False False
-    baseUrl = BaseUrl Https "127.0.0.1" 8443 ""
+    host = def { remoteHostHost = "127.0.0.1"
+               , remoteHostClientKey = NoClientAuth }
