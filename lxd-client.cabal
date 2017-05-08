@@ -31,6 +31,7 @@ library
                      , text
                      , tls
                      , transformers
+                     , x509
                      , x509-store
                      , x509-validation
   ghc-options:         -Wall

@@ -11,6 +11,7 @@ module Network.LXD.Client (
   -- * HTTPS Clients
 , remoteHostClient
 , remoteHostManager
+, clientManager
 ) where
 
 import Control.Exception (SomeException, tryJust, toException)
@@ -21,7 +22,11 @@ import Control.Monad.Trans.Either (EitherT(..))
 
 import Data.Default (Default, def)
 import Data.Either.Combinators (mapLeft)
-import Data.X509.Validation (validateDefault)
+import Data.X509 (CertificateChain)
+import Data.X509.Validation (ValidationCache,
+                             FailedReason(NameMismatch),
+                             ServiceID,
+                             validateDefault)
 import Data.X509.CertificateStore (CertificateStore, readCertificateStore)
 
 import Network.LXD.Client.API
@@ -31,11 +36,13 @@ import Network.Connection (TLSSettings(..))
 import Network.HTTP.Client (Manager, ManagerSettings, newManager)
 import Network.HTTP.Client.TLS (mkManagerSettings)
 import Network.TLS (ClientHooks(onCertificateRequest, onServerCertificate),
-                    ClientParams(clientShared, clientHooks),
+                    ClientParams(clientShared, clientHooks, clientSupported),
                     Credential,
                     Shared(sharedCAStore),
+                    Supported(supportedCiphers),
                     credentialLoadX509,
                     defaultParamsClient)
+import Network.TLS.Extra.Cipher (ciphersuite_all)
 
 import Servant.Client (BaseUrl(..), ClientEnv(..), Scheme(Https))
 
@@ -121,12 +128,23 @@ clientTlsSettings host creds caStore =
     TLSSettings clientParams
   where
     hooks = def { onCertificateRequest = const $ return creds
-                , onServerCertificate  = validateDefault }
+                , onServerCertificate  = validateServerCert }
     clientParams = (defaultParamsClient host "")
                    { clientShared = shared
-                   , clientHooks  = hooks }
+                   , clientHooks  = hooks
+                   , clientSupported = def { supportedCiphers = ciphersuite_all }
+                   }
     shared | Just store <- caStore = def { sharedCAStore = store }
            | otherwise             = def
+
+validateServerCert :: CertificateStore
+                   -> ValidationCache
+                   -> ServiceID
+                   -> CertificateChain
+                   -> IO [FailedReason]
+validateServerCert a b c d = filter (not . ignore) <$> validateDefault a b c d
+  where ignore x | NameMismatch _ <- x = True
+                 | otherwise = False
 
 catchAdditional :: IO (Either String a) -> IO (Either String a)
 catchAdditional action = join . mapLeft show <$> tryJust (Just . toException') action
