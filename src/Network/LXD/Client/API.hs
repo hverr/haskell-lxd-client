@@ -16,5 +16,6 @@ api :: Proxy API
 api = Proxy
 
 supportedVersions :: ClientM (Response [ApiVersion])
-apiConfig :: ClientM (Response ApiConfig)
+apiConfig         :: ClientM (Response ApiConfig)
+
 supportedVersions :<|> apiConfig = client api

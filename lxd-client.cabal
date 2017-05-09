@@ -46,6 +46,8 @@ test-suite lxd-client-test
                      , lxd-client
                      , data-default
                      , either
+                     , mtl
+                     , transformers
                      , servant-client
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
   default-extensions:  OverloadedStrings

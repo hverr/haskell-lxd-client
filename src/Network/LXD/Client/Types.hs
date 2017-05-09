@@ -31,6 +31,7 @@ data ApiConfig = ApiConfig {
   , authStatus :: AuthStatus
   , serverConfig :: Maybe Value
   , serverEnv :: Maybe Value
+  , serverPublic :: Bool
 } deriving (Show)
 
 instance FromJSON ApiConfig where
@@ -41,6 +42,7 @@ instance FromJSON ApiConfig where
         <*> v .: "auth"
         <*> v .:? "config"
         <*> v .:? "environment"
+        <*> v .: "public"
 
 data ResponseType = Sync | Async deriving (Show)
 
@@ -64,7 +66,7 @@ instance FromJSON ApiStatus where
         "deprecated"  -> pure Deprecated
         v             -> fail $ "Unknown value: " ++ show v
 
-data AuthStatus = Guest | Untrusted | Trusted deriving (Show)
+data AuthStatus = Guest | Untrusted | Trusted deriving (Eq, Show)
 
 instance FromJSON AuthStatus where
     parseJSON = withText "AuthStatus" $ \case
