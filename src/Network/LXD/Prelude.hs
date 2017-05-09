@@ -10,6 +10,9 @@ module Network.LXD.Prelude (
 , MonadIO, liftIO
 , MonadState, StateT(..), modify, get, put
 , MonadTrans, lift
+
+  -- * Foldable
+, foldlM
 ) where
 
 import Prelude hiding (error)
@@ -22,3 +25,6 @@ import Control.Monad.Except (MonadError, ExceptT, runExceptT, throwError)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.State (MonadState, StateT(..), modify, get, put)
 import Control.Monad.Trans.Class (MonadTrans, lift)
+
+-- Foldable
+import Data.Foldable (foldlM)
