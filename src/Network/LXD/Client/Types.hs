@@ -46,7 +46,7 @@ instance FromJSON ApiConfig where
         <*> v .:? "environment"
         <*> v .: "public"
 
-data ResponseType = Sync | Async deriving (Show)
+data ResponseType = Sync | Async deriving (Eq, Show)
 
 instance FromJSON ResponseType where
     parseJSON = withText "ResponseType" $ \case
@@ -54,12 +54,12 @@ instance FromJSON ResponseType where
         "async" -> pure Async
         v       -> fail $ "Unknown value: " ++ show v
 
-newtype ApiVersion = ApiVersion String deriving (Show)
+newtype ApiVersion = ApiVersion String deriving (Eq, Show)
 
 instance FromJSON ApiVersion where
     parseJSON = withText "ApiVersion" $ pure . ApiVersion . unpack
 
-data ApiStatus = Development | Stable | Deprecated deriving (Show)
+data ApiStatus = Development | Stable | Deprecated deriving (Eq, Show)
 
 instance FromJSON ApiStatus where
     parseJSON = withText "ApiStatus" $ \case
