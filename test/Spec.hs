@@ -3,16 +3,9 @@
 {-# LANGUAGE RecordWildCards #-}
 module Main where
 
-import Prelude hiding (error)
-
-import Control.Monad.Except (MonadError, throwError)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.State (MonadState, StateT(..), modify)
-import Control.Monad.Trans.Class (MonadTrans, lift)
-import Control.Monad.Trans.Either (EitherT(..))
+import Network.LXD.Prelude
 
 import Data.Default (def)
-import Data.Foldable (foldlM)
 
 import Servant.Client (runClientM)
 
@@ -61,7 +54,7 @@ runTester' tester = do
     runSingleTest :: MonadIO m => Int -> (Int, Int) -> (String, Test m String) -> m (Int, Int)
     runSingleTest total (i, failures) (name, action) = do
         liftIO . putStrLn $ "Testing (" ++ show i ++ "/" ++ show total ++ ") " ++ show name
-        res <- runEitherT . runTest $ action
+        res <- runExceptT . runTest $ action
         case res of
             Left err -> do
                 liftIO . putStrLn $ "    error:   " ++ err
@@ -70,7 +63,7 @@ runTester' tester = do
                 liftIO . putStrLn $ "    success: " ++ v
                 return (i+1, failures)
 
-newtype Test m a = Test { runTest :: EitherT String m a }
+newtype Test m a = Test { runTest :: ExceptT String m a }
                deriving (Functor, Applicative, Monad, MonadIO, MonadError String)
 
 instance MonadTrans Test where

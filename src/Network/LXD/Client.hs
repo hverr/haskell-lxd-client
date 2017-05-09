@@ -15,10 +15,9 @@ module Network.LXD.Client (
 , clientManager
 ) where
 
+import Network.LXD.Prelude
+
 import Control.Exception (SomeException, tryJust, toException)
-import Control.Monad (join)
-import Control.Monad.Except (MonadError, throwError)
-import Control.Monad.IO.Class (MonadIO, liftIO)
 
 import Data.Default (Default, def)
 import Data.Either.Combinators (mapLeft)

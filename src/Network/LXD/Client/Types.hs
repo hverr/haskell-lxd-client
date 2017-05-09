@@ -1,6 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 module Network.LXD.Client.Types where
 
+import Network.LXD.Prelude
+
 import Data.Aeson
 import Data.Text (unpack)
 
