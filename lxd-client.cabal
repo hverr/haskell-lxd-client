@@ -26,6 +26,7 @@ library
                      , either
                      , http-client
                      , http-client-tls
+                     , mtl
                      , servant
                      , servant-client
                      , text

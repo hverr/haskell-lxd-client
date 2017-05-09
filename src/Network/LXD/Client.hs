@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 module Network.LXD.Client (
   module Network.LXD.Client.API
@@ -12,13 +13,13 @@ module Network.LXD.Client (
 , remoteHostClient
 , remoteHostManager
 , clientManager
+, runClient
 ) where
 
 import Control.Exception (SomeException, tryJust, toException)
 import Control.Monad (join)
+import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.Either (EitherT(..))
 
 import Data.Default (Default, def)
 import Data.Either.Combinators (mapLeft)
@@ -92,35 +93,36 @@ serverCertificate DefaultCAStore             = Nothing
 serverCertificate (DefaultServerAuth remote) = Just ("~/.config/lxc/servercerts/" ++ remote ++ ".crt")
 serverCertificate (ServerAuth cert)          = Just cert
 
-remoteHostManager :: MonadIO m => RemoteHost -> EitherT String m Manager
+remoteHostManager :: (MonadError String m, MonadIO m) => RemoteHost -> m Manager
 remoteHostManager RemoteHost{..} = clientManager remoteHostHost
                                                  (privateKey remoteHostClientKey)
                                                  (serverCertificate remoteHostCertificate)
 
-remoteHostClient :: MonadIO m => RemoteHost -> EitherT String m ClientEnv
+remoteHostClient :: (MonadError String m, MonadIO m) => RemoteHost -> m ClientEnv
 remoteHostClient remote@RemoteHost{..} =
     ClientEnv <$> remoteHostManager remote <*> pure baseUrl
   where
     baseUrl = BaseUrl Https remoteHostHost remoteHostPort remoteHostBasePath
 
 
-clientManager :: MonadIO m => Host -> Maybe PrivateKey -> Maybe Certificate -> EitherT String m Manager
+clientManager :: (MonadError String m, MonadIO m) => Host -> Maybe PrivateKey -> Maybe Certificate -> m Manager
 clientManager = ((.).(.).(.)) (>>= newManager') clientManagerSettings
-  where newManager' = EitherT . liftIO . (Right <$>) . newManager
+  where newManager' = liftIO . newManager
 
-clientManagerSettings :: MonadIO m => Host -> Maybe PrivateKey -> Maybe Certificate -> EitherT String m ManagerSettings
+clientManagerSettings :: (MonadError String m, MonadIO m) => Host -> Maybe PrivateKey -> Maybe Certificate -> m ManagerSettings
 clientManagerSettings host clientKey serverCert = do
     tlsSettings <- clientTlsSettings host <$> credentials clientKey <*> caStore serverCert
     return $ mkManagerSettings tlsSettings Nothing
   where
     credentials Nothing                      = return Nothing
     credentials (Just (PrivateKey cert key)) = do
-        cert' <- lift $ expandHomeDirectory cert
-        key'  <- lift $ expandHomeDirectory key
-        Just <$> (EitherT . liftIO . catchAdditional $ credentialLoadX509 cert' key')
+        cert' <- expandHomeDirectory cert
+        key'  <- expandHomeDirectory key
+        creds <- liftIO . catchAdditional $ credentialLoadX509 cert' key'
+        Just <$> eitherToError creds
 
     caStore Nothing     = return Nothing
-    caStore (Just cert) = Just <$> (EitherT . liftIO $ readCertificateStore' cert)
+    caStore (Just cert) = Just <$> (eitherToError =<< liftIO (readCertificateStore' cert))
     readCertificateStore' cert = maybe (Left $ "error: could not read certificate at " ++ cert) Right <$> readCertificateStore cert
 
 clientTlsSettings :: Host -> Maybe Credential -> Maybe CertificateStore -> TLSSettings
@@ -155,3 +157,7 @@ catchAdditional action = join . mapLeft show <$> tryJust (Just . toException') a
 expandHomeDirectory :: MonadIO m => FilePath -> m FilePath
 expandHomeDirectory ('~':'/':xs) = (++ "/" ++ xs) <$> liftIO getHomeDirectory
 expandHomeDirectory x            = return x
+
+eitherToError :: MonadError err m => Either err a -> m a
+eitherToError (Left  x) = throwError x
+eitherToError (Right x) = return x

@@ -30,7 +30,7 @@ test name action = do
 
 connectToRemote :: MonadIO m => ClientAuth -> Test m ApiConfig
 connectToRemote auth = do
-    client <- Test $ remoteHostClient host
+    client <- remoteHostClient host
     resp <- assertEitherShow =<< (lift . liftIO $ runClientM apiConfig client)
     dat <- assertResponseOK resp
     case auth of NoClientAuth      -> assertEq Untrusted (authStatus dat)
