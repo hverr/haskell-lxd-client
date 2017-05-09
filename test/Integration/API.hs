@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards #-}
-module Main where
+module Integration.API where
 
 import Network.LXD.Prelude
 import Testing
@@ -9,9 +9,6 @@ import Data.Default (def)
 import Servant.Client (runClientM)
 
 import Network.LXD.Client
-
-main :: IO ()
-main = runTester' apiTester
 
 apiTester :: Tester IO ()
 apiTester = do

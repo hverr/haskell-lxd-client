@@ -43,8 +43,9 @@ library
 test-suite lxd-client-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
-  main-is:             Spec.hs
-  other-modules:       Testing
+  main-is:             Main.hs
+  other-modules:       Integration.API
+                     , Testing
   build-depends:       base
                      , lxd-client
                      , data-default
