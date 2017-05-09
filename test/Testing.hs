@@ -10,10 +10,10 @@ instance MonadTrans Tester where
     lift = Tester . lift
 
 test :: Monad io => String -> Test io String -> Tester io ()
-test name test' = modify ((name, test'):)
+test name test' = modify (++ [(name, test')])
 
 testShow :: (Monad io, Show a)  => String -> Test io a -> Tester io ()
-testShow name test' = modify ((name, show <$> test'):)
+testShow name test' = test name (show <$> test')
 
 runTester' :: MonadIO m => Tester m () -> m ()
 runTester' tester = do
@@ -24,6 +24,7 @@ runTester' tester = do
   where
     runSingleTest :: MonadIO m => Int -> (Int, Int) -> (String, Test m String) -> m (Int, Int)
     runSingleTest total (i, failures) (name, action) = do
+        liftIO . putStrLn $ ""
         liftIO . putStrLn $ "Testing (" ++ show i ++ "/" ++ show total ++ ") " ++ show name
         res <- runExceptT . runTest $ action
         case res of
