@@ -13,7 +13,6 @@ module Network.LXD.Client (
 , remoteHostClient
 , remoteHostManager
 , clientManager
-, runClient
 ) where
 
 import Control.Exception (SomeException, tryJust, toException)

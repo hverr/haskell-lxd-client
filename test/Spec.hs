@@ -1,3 +1,4 @@
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE RecordWildCards #-}
 module Main where
@@ -6,27 +7,24 @@ import Prelude hiding (error)
 
 import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.State (MonadState, StateT(..), modify)
 import Control.Monad.Trans.Class (MonadTrans, lift)
 import Control.Monad.Trans.Either (EitherT(..))
 
 import Data.Default (def)
+import Data.Foldable (foldlM)
 
 import Servant.Client (runClientM)
 
 import Network.LXD.Client
 
 main :: IO ()
-main = do
-    test "connectToRemote guest"   $ connectToRemote NoClientAuth
-    test "connectToRemote trusted" $ connectToRemote DefaultClientAuth
+main = runTester' apiTester
 
-test :: (MonadIO m, Show a) => Show a => String -> Test m a -> m ()
-test name action = do
-    liftIO . putStrLn $ "Testing " ++ name
-    res <- runEitherT . runTest $ action
-    case res of
-        Left err -> liftIO . putStrLn $ "    error:   " ++ show err
-        Right v  -> liftIO . putStrLn $ "    success: " ++ show v
+apiTester :: Tester IO ()
+apiTester = do
+    testShow "connectToRemote guest"   $ connectToRemote NoClientAuth
+    testShow "connectToRemote trusted" $ connectToRemote DefaultClientAuth
 
 connectToRemote :: MonadIO m => ClientAuth -> Test m ApiConfig
 connectToRemote auth = do
@@ -40,6 +38,37 @@ connectToRemote auth = do
   where
     host = def { remoteHostHost = "127.0.0.1"
                , remoteHostClientKey = auth }
+
+newtype Tester m a = Tester { runTester :: StateT [(String, Test m String)] m a }
+                   deriving (Functor, Applicative, Monad, MonadIO, MonadState [(String, Test m String)])
+
+instance MonadTrans Tester where
+    lift = Tester . lift
+
+test :: Monad io => String -> Test io String -> Tester io ()
+test name test' = modify ((name, test'):)
+
+testShow :: (Monad io, Show a)  => String -> Test io a -> Tester io ()
+testShow name test' = modify ((name, show <$> test'):)
+
+runTester' :: MonadIO m => Tester m () -> m ()
+runTester' tester = do
+    tests <- snd <$> (flip runStateT [] . runTester $ tester)
+    failures <- snd <$> foldlM (runSingleTest (length tests)) (1, 0) tests
+    liftIO . putStrLn $ ""
+    liftIO . putStrLn $ "Tests finished: " ++ show failures ++ "/" ++ show (length tests) ++ " failed"
+  where
+    runSingleTest :: MonadIO m => Int -> (Int, Int) -> (String, Test m String) -> m (Int, Int)
+    runSingleTest total (i, failures) (name, action) = do
+        liftIO . putStrLn $ "Testing (" ++ show i ++ "/" ++ show total ++ ") " ++ show name
+        res <- runEitherT . runTest $ action
+        case res of
+            Left err -> do
+                liftIO . putStrLn $ "    error:   " ++ err
+                return (i+1, failures+1)
+            Right v  -> do
+                liftIO . putStrLn $ "    success: " ++ v
+                return (i+1, failures)
 
 newtype Test m a = Test { runTest :: EitherT String m a }
                deriving (Functor, Applicative, Monad, MonadIO, MonadError String)
