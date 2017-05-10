@@ -13,6 +13,9 @@ module Network.LXD.Prelude (
 
   -- * Foldable
 , foldlM
+
+  -- * Strings
+, IsString(fromString)
 ) where
 
 import Prelude hiding (error)
@@ -28,3 +31,6 @@ import Control.Monad.Trans.Class (MonadTrans, lift)
 
 -- Foldable
 import Data.Foldable (foldlM)
+
+-- Strings
+import Data.String (IsString(fromString))

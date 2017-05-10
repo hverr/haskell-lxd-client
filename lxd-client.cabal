@@ -25,6 +25,7 @@ library
                      , data-default
                      , directory
                      , either
+                     , http-api-data
                      , http-client
                      , http-client-tls
                      , mtl

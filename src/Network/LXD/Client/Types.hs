@@ -5,7 +5,9 @@ import Network.LXD.Prelude
 
 import Data.Aeson
 import Data.List (stripPrefix)
-import Data.Text (unpack)
+import Data.Text (pack, unpack)
+
+import Web.Internal.HttpApiData (ToHttpApiData(..))
 
 data Response a = Response {
     responseType :: ResponseType
@@ -64,6 +66,44 @@ instance FromJSON ContainerName where
         case stripPrefix prefix (unpack text) of
             Nothing -> fail $ "could not parse container name: no prefix " ++ prefix
             Just name -> return $ ContainerName name
+
+instance IsString ContainerName where
+    fromString = ContainerName
+
+instance ToHttpApiData ContainerName where
+    toUrlPiece (ContainerName name) = pack name
+
+data Container = Container {
+    containerArchitecture :: String
+  , containerName :: String
+  , containerConfig :: Value
+  , containerCreatedAt :: String
+  , containerDevices :: Value
+  , containerEphemeral :: Bool
+  , containerProfiles :: [String]
+  , containerStateful :: Bool
+  , containerExpandedConfig :: Value
+  , containerExpandedDevices :: Value
+  , containerStatus :: String
+  , containerSatusCode :: Int
+  , containerLastUsedAt :: String
+} deriving (Show)
+
+instance FromJSON Container where
+    parseJSON = withObject "Container" $ \v -> Container
+        <$> v .: "architecture"
+        <*> v .: "name"
+        <*> v .: "config"
+        <*> v .: "created_at"
+        <*> v .: "devices"
+        <*> v .: "ephemeral"
+        <*> v .: "profiles"
+        <*> v .: "stateful"
+        <*> v .: "expanded_config"
+        <*> v .: "expanded_devices"
+        <*> v .: "status"
+        <*> v .: "status_code"
+        <*> v .: "last_used_at"
 
 data ResponseType = Sync | Async deriving (Eq, Show)
 

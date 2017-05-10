@@ -19,6 +19,7 @@ apiTester = do
     testShow "testSupportedVersions"   testSupportedVersions
     testShow "testTrustedCertificates" testTrustedCertificates
     testShow "testContainerNames"      testContainerNames
+    testShow "testContainer"           testContainer
 
 connectToRemote :: MonadIO m => Bool -> Test m ApiConfig
 connectToRemote trusted = do
@@ -51,6 +52,10 @@ testContainerNames = do
     names <- assertResponseOK resp
     assertNotEq names []
     return names
+
+testContainer :: MonadIO m => Test m Container
+testContainer =
+    runTrusted (container "test") >>= assertResponseOK
 
 trustedClient :: (MonadError String m, MonadIO m) => m ClientEnv
 trustedClient = remoteHostClient host
