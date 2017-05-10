@@ -56,6 +56,15 @@ instance FromJSON CertificateHash where
             Nothing -> fail $ "could not parse hash: no prefix " ++ prefix
             Just hash -> return $ CertificateHash hash
 
+newtype ContainerName = ContainerName String deriving (Eq, Show)
+
+instance FromJSON ContainerName where
+    parseJSON = withText "ContainerName" $ \text ->
+        let prefix = "/1.0/containers/" in
+        case stripPrefix prefix (unpack text) of
+            Nothing -> fail $ "could not parse container name: no prefix " ++ prefix
+            Just name -> return $ ContainerName name
+
 data ResponseType = Sync | Async deriving (Eq, Show)
 
 instance FromJSON ResponseType where
