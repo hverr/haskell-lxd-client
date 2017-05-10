@@ -48,6 +48,9 @@ assertTrue False m = throwError m
 assertEq :: (Monad m, Eq a, Show a) => a -> a -> Test m ()
 assertEq a b = assertTrue (a == b) $ "Expected equality but got: " ++ show a ++ " /= " ++ show b
 
+assertNotEq :: (Monad m, Eq a, Show a) => a -> a -> Test m ()
+assertNotEq a b = assertTrue (a /= b) $ "Expected not equal but got: " ++ show a ++ " == " ++ show b
+
 assertEither :: Monad m => Either String a -> Test m a
 assertEither (Right x) = return x
 assertEither (Left  m) = throwError m

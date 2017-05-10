@@ -4,6 +4,7 @@ module Network.LXD.Client.Types where
 import Network.LXD.Prelude
 
 import Data.Aeson
+import Data.List (stripPrefix)
 import Data.Text (unpack)
 
 data Response a = Response {
@@ -45,6 +46,15 @@ instance FromJSON ApiConfig where
         <*> v .:? "config"
         <*> v .:? "environment"
         <*> v .: "public"
+
+newtype CertificateHash = CertificateHash String deriving (Eq, Show)
+
+instance FromJSON CertificateHash where
+    parseJSON = withText "CertificateHash" $ \text ->
+        let prefix = "/1.0/certificates/" in
+        case stripPrefix prefix (unpack text) of
+            Nothing -> fail $ "could not parse hash: no prefix " ++ prefix
+            Just hash -> return $ CertificateHash hash
 
 data ResponseType = Sync | Async deriving (Eq, Show)
 

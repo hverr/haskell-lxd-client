@@ -16,7 +16,8 @@ apiTester = do
     testShow "connectToRemote trusted"   $ connectToRemote True
     testShow "connectToRemote untrusted" $ connectToRemote False
 
-    testShow "testSupportedVersions" testSupportedVersions
+    testShow "testSupportedVersions"   testSupportedVersions
+    testShow "testTrustedCertificates" testTrustedCertificates
 
 connectToRemote :: MonadIO m => Bool -> Test m ApiConfig
 connectToRemote trusted = do
@@ -35,6 +36,13 @@ testSupportedVersions = do
     dat <- assertResponseOK resp
     assertEq dat [ApiVersion "/1.0"]
     return dat
+
+testTrustedCertificates :: MonadIO m => Test m [CertificateHash]
+testTrustedCertificates = do
+    resp <- runTrusted trustedCertificates
+    certs <- assertResponseOK resp
+    assertNotEq certs []
+    return certs
 
 trustedClient :: (MonadError String m, MonadIO m) => m ClientEnv
 trustedClient = remoteHostClient host
