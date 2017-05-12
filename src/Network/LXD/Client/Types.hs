@@ -9,6 +9,7 @@ import Data.Text (pack, unpack)
 
 import Web.Internal.HttpApiData (ToHttpApiData(..))
 
+-- | Generic LXD API response object.
 data Response a = Response {
     responseType :: ResponseType
   , status :: String
@@ -29,6 +30,10 @@ instance FromJSON a => FromJSON (Response a) where
         <*> v .: "error"
         <*> v .: "metadata"
 
+-- | LXD API configuration object.
+--
+-- Returend when querying GET /1.0. Some objects may not be present if
+-- an untrusted requeset was made.
 data ApiConfig = ApiConfig {
     apiExtensions :: [String]
   , apiStatus :: ApiStatus
@@ -49,6 +54,7 @@ instance FromJSON ApiConfig where
         <*> v .:? "environment"
         <*> v .: "public"
 
+-- | LXD trusted certificate hash.
 newtype CertificateHash = CertificateHash String deriving (Eq, Show)
 
 instance FromJSON CertificateHash where
@@ -58,6 +64,7 @@ instance FromJSON CertificateHash where
             Nothing -> fail $ "could not parse hash: no prefix " ++ prefix
             Just hash -> return $ CertificateHash hash
 
+-- | LXD container name.
 newtype ContainerName = ContainerName String deriving (Eq, Show)
 
 instance FromJSON ContainerName where
@@ -73,6 +80,9 @@ instance IsString ContainerName where
 instance ToHttpApiData ContainerName where
     toUrlPiece (ContainerName name) = pack name
 
+-- | LXD container information.
+--
+-- Returned when querying GET /1.0/containers/<name>.
 data Container = Container {
     containerArchitecture :: String
   , containerName :: String
@@ -113,6 +123,7 @@ instance FromJSON ResponseType where
         "async" -> pure Async
         v       -> fail $ "Unknown value: " ++ show v
 
+-- | LXD API version string, e.g. 1.0.
 newtype ApiVersion = ApiVersion String deriving (Eq, Show)
 
 instance FromJSON ApiVersion where
