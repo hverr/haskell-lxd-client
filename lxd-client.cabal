@@ -21,6 +21,7 @@ library
                      , Network.LXD.Prelude
   build-depends:       base >= 4.7 && < 5
                      , aeson
+                     , bytestring
                      , connection
                      , containers
                      , data-default
@@ -35,6 +36,7 @@ library
                      , text
                      , tls
                      , transformers
+                     , websockets
                      , x509
                      , x509-store
                      , x509-validation

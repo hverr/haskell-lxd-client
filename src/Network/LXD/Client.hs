@@ -13,11 +13,14 @@ module Network.LXD.Client (
 , remoteHostClient
 , remoteHostManager
 , clientManager
+
+  -- * WebSockets Clients
+, runWebSockets
 ) where
 
 import Network.LXD.Prelude
 
-import Control.Exception (SomeException, tryJust, toException)
+import Control.Exception (SomeException, tryJust, toException, throwIO, bracket)
 
 import Data.Default (Default, def)
 import Data.Either.Combinators (mapLeft)
@@ -27,11 +30,12 @@ import Data.X509.Validation (ValidationCache,
                              ServiceID,
                              validateDefault)
 import Data.X509.CertificateStore (CertificateStore, readCertificateStore)
+import qualified Data.ByteString.Lazy as B
 
 import Network.LXD.Client.API
 import Network.LXD.Client.Types
 
-import Network.Connection (TLSSettings(..))
+import Network.Connection (ConnectionParams(..), TLSSettings(..), initConnectionContext)
 import Network.HTTP.Client (Manager, ManagerSettings, newManager)
 import Network.HTTP.Client.TLS (mkManagerSettings)
 import Network.TLS (ClientHooks(onCertificateRequest, onServerCertificate),
@@ -42,10 +46,14 @@ import Network.TLS (ClientHooks(onCertificateRequest, onServerCertificate),
                     credentialLoadX509,
                     defaultParamsClient)
 import Network.TLS.Extra.Cipher (ciphersuite_all)
+import qualified Network.Connection as Con
+import qualified Network.WebSockets as WS
+import qualified Network.WebSockets.Stream as WS
 
 import Servant.Client (BaseUrl(..), ClientEnv(..), Scheme(Https))
 
 import System.Directory (getHomeDirectory)
+import System.IO.Error (catchIOError, isEOFError)
 
 type RemoteName = String
 type Host = String
@@ -109,8 +117,12 @@ clientManager = ((.).(.).(.)) (>>= newManager') clientManagerSettings
 
 clientManagerSettings :: (MonadError String m, MonadIO m) => Host -> Maybe PrivateKey -> Maybe Certificate -> m ManagerSettings
 clientManagerSettings host clientKey serverCert = do
-    tlsSettings <- clientTlsSettings host <$> credentials clientKey <*> caStore serverCert
+    tlsSettings <- clientTlsSettings host clientKey serverCert
     return $ mkManagerSettings tlsSettings Nothing
+
+clientTlsSettings :: (MonadError String m, MonadIO m) => Host -> Maybe PrivateKey -> Maybe Certificate -> m TLSSettings
+clientTlsSettings host clientKey serverCert =
+    clientTlsSettings' host <$> credentials clientKey <*> caStore serverCert
   where
     credentials Nothing                      = return Nothing
     credentials (Just (PrivateKey cert key)) = do
@@ -123,8 +135,8 @@ clientManagerSettings host clientKey serverCert = do
     caStore (Just cert) = Just <$> (eitherToError =<< liftIO (readCertificateStore' cert))
     readCertificateStore' cert = maybe (Left $ "error: could not read certificate at " ++ cert) Right <$> readCertificateStore cert
 
-clientTlsSettings :: Host -> Maybe Credential -> Maybe CertificateStore -> TLSSettings
-clientTlsSettings host creds caStore =
+clientTlsSettings' :: Host -> Maybe Credential -> Maybe CertificateStore -> TLSSettings
+clientTlsSettings' host creds caStore =
     TLSSettings clientParams
   where
     hooks = def { onCertificateRequest = const $ return creds
@@ -136,6 +148,41 @@ clientTlsSettings host creds caStore =
                    }
     shared | Just store <- caStore = def { sharedCAStore = store }
            | otherwise             = def
+
+clientConnectionParams :: (MonadError String m, MonadIO m) => RemoteHost -> m ConnectionParams
+clientConnectionParams RemoteHost{..} = do
+    tlsSettings <- clientTlsSettings remoteHostHost
+                                     (privateKey remoteHostClientKey)
+                                     (serverCertificate remoteHostCertificate)
+    return ConnectionParams { connectionHostname = remoteHostHost
+                            , connectionPort = fromIntegral remoteHostPort
+                            , connectionUseSecure = Just tlsSettings
+                            , connectionUseSocks = Nothing }
+
+runWebSockets :: (MonadError String m, MonadIO m) => RemoteHost -> String -> WS.ClientApp a -> m a
+runWebSockets host path app = do
+    ctx    <- liftIO initConnectionContext
+    params <- clientConnectionParams host
+    liftIO $ bracket (Con.connectTo ctx params)
+                     Con.connectionClose
+                     action
+  where
+    action con = do
+        stream <- WS.makeStream (reader con) (writer con)
+        WS.runClientWithStream stream
+                               (remoteHostHost host)
+                               path
+                               WS.defaultConnectionOptions
+                               []
+                               app
+
+    reader con = catchIOError (Just <$> Con.connectionGetChunk con) $ \e ->
+                              if isEOFError e
+                                  then return Nothing
+                                  else throwIO e
+    writer con bs = case bs of
+        Nothing -> return ()
+        Just bs' -> Con.connectionPut con (B.toStrict bs')
 
 validateServerCert :: CertificateStore
                    -> ValidationCache
