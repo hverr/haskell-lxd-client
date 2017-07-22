@@ -16,10 +16,17 @@ module Network.LXD.Client.API (
 , containerExecWebsocketInteractive
 , containerExecWebsocketNonInteractive
 
+  -- ** Operations
+, operationIds
+, operation
+, operationCancel
+, operationWait
+
   -- * Helpers
 , ExecClient
 ) where
 
+import Data.Aeson (Value)
 import Data.Proxy
 
 import Servant.API
@@ -35,6 +42,10 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> ExecAPI 'ExecImmediate
       :<|> ExecAPI 'ExecWebsocketInteractive
       :<|> ExecAPI 'ExecWebsocketNonInteractive
+      :<|> "1.0" :> "operations" :> Get '[JSON] (Response AllOperations)
+      :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Get '[JSON] (Response Operation)
+      :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Delete '[JSON] (Response Value)
+      :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> "wait" :> Get '[JSON] (Response Value)
 
 
 api :: Proxy API
@@ -48,6 +59,10 @@ container                            :: ContainerName -> ClientM (Response Conta
 containerExecImmediate               :: ExecClient 'ExecImmediate
 containerExecWebsocketInteractive    :: ExecClient 'ExecWebsocketInteractive
 containerExecWebsocketNonInteractive :: ExecClient 'ExecWebsocketNonInteractive
+operationIds                         :: ClientM (Response AllOperations)
+operation                            :: OperationId -> ClientM (Response Operation)
+operationCancel                      :: OperationId -> ClientM (Response Value)
+operationWait                        :: OperationId -> ClientM (Response Value)
 
 supportedVersions                        :<|>
     apiConfig                            :<|>
@@ -56,9 +71,13 @@ supportedVersions                        :<|>
     container                            :<|>
     containerExecImmediate               :<|>
     containerExecWebsocketInteractive    :<|>
-    containerExecWebsocketNonInteractive
+    containerExecWebsocketNonInteractive :<|>
+    operationIds                         :<|>
+    operation                            :<|>
+    operationCancel                      :<|>
+    operationWait
     = client api
 
-type ExecAPI a = "1.0" :> "containers" :> Capture "name" ContainerName :> "exec" :> ReqBody '[JSON] (ExecRequest a) :> Post '[JSON] (Response (ExecResponse a))
+type ExecAPI a = "1.0" :> "containers" :> Capture "name" ContainerName :> "exec" :> ReqBody '[JSON] (ExecRequest a) :> Post '[JSON] (ResponseOp (ExecResponse a))
 
-type ExecClient a = ContainerName -> ExecRequest a -> ClientM (Response (ExecResponse a))
+type ExecClient a = ContainerName -> ExecRequest a -> ClientM (ResponseOp (ExecResponse a))

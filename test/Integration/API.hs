@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 module Integration.API where
@@ -5,7 +6,10 @@ module Integration.API where
 import Network.LXD.Prelude
 import Testing
 
+import Control.Monad.Trans.Maybe
+
 import Data.Default (def)
+import qualified Data.Map.Strict as Map
 
 import Servant.Client (ClientEnv, ClientM, runClientM)
 
@@ -23,6 +27,10 @@ apiTester = do
     testShow "testContainer"      testContainer
 
     testShow "testContainerExecImmediate" testContainerExecImmediate
+
+    testShow "testOperationIds"    testOperationIds
+    testShow "testOperation"       testOperation
+
 
 connectToRemote :: MonadIO m => Bool -> Test m ApiConfig
 connectToRemote trusted = do
@@ -60,11 +68,29 @@ testContainer :: MonadIO m => Test m Container
 testContainer =
     runTrusted (container "test") >>= assertResponseOK
 
-testContainerExecImmediate :: MonadIO m => Test m ExecResponseImmediate
+testContainerExecImmediate :: MonadIO m => Test m (ExecResponse 'ExecImmediate)
 testContainerExecImmediate =
     runTrusted (containerExecImmediate "test" req) >>= assertResponseCreated
   where
     req = def { execRequestCommand = ["/bin/echo", "Hello, World!"] }
+
+testOperationIds :: MonadIO m => Test m AllOperations
+testOperationIds =
+    runTrusted operationIds >>= assertResponseOK
+
+testOperation :: MonadIO m => Test m (Maybe Operation)
+testOperation = runMaybeT $
+    lift (runTrusted operationIds)
+    >>= lift . assertResponseOK
+    >>= head'
+    >>= lift . runTrusted . operation
+    >>= lift . assertResponseOK
+ where
+   head' (AllOperations m) =
+     case fst <$> Map.minView m of
+       Nothing    -> MaybeT (return Nothing)
+       Just []    -> MaybeT (return Nothing)
+       Just (x:_) -> return x
 
 trustedClient :: (MonadError String m, MonadIO m) => m ClientEnv
 trustedClient = remoteHostClient host
@@ -84,12 +110,17 @@ runTrusted action = do
     client <- trustedClient
     liftIO (runClientM action client) >>= assertEitherShow
 
-assertResponseOK :: Monad m => Response a -> Test m a
+assertResponseOK :: Monad m => GenericResponse op a -> Test m a
 assertResponseOK Response{..}
     | 200 <- statusCode = return metadata
     | otherwise = throwError $ "Expected response with code 200 but got " ++ show statusCode ++ " with error code " ++ show errorCode ++ " (" ++ show error ++ ")"
 
-assertResponseCreated :: Monad m => Response a -> Test m a
+assertResponseCreated :: Monad m => GenericResponse op a -> Test m a
 assertResponseCreated Response{..}
     | 100 <- statusCode = return metadata
     | otherwise = throwError $ "Exepected response with code 100 but got " ++ show statusCode
+
+assertResponseAccepted :: Monad m => GenericResponse op a -> Test m a
+assertResponseAccepted Response{..}
+    | 202 <- statusCode = return metadata
+    | otherwise = throwError $ "Exepected response with code 202 but got " ++ show statusCode

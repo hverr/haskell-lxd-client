@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
@@ -6,9 +7,12 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 module Network.LXD.Client.Types (
   -- * Generic responses
-  Response(..)
+  GenericResponse(..)
+, Response
+, ResponseOp
 , ResponseType(..)
   -- ** Background operations
 , BackgroundOperation(..)
@@ -29,13 +33,20 @@ module Network.LXD.Client.Types (
   -- ** Executing commands
 , ExecParams(..)
 , ExecRequest(..)
-, ExecResponseImmediate
-, ExecResponseWebsocket(..)
-, ExecResponse
+, ExecResponse(..)
+, ExecResponseMetadataImmediate
+, ExecResponseMetadataWebsocket(..)
+, ExecResponseMetadata
   -- ** Working with file descriptors
 , FdSet(..)
 , Fds(..)
 , ExecFds
+
+  -- * Operations
+, OperationId(..)
+, OperationStatus
+, AllOperations(..)
+, Operation(..)
 ) where
 
 import Network.LXD.Prelude
@@ -50,17 +61,23 @@ import qualified Data.Map.Strict as Map
 import Web.Internal.HttpApiData (ToHttpApiData(..))
 
 -- | Generic LXD API response object.
-data Response a = Response {
+data GenericResponse op a = Response {
     responseType :: ResponseType
   , status :: String
   , statusCode :: Int
-  , operation :: String
+  , responseOperation :: op
   , errorCode :: Int
   , error :: String
   , metadata :: a
 } deriving (Show)
 
-instance FromJSON a => FromJSON (Response a) where
+-- | LXD API repsonse object, without resulting operation.
+type Response a = GenericResponse String a
+
+-- | LXD API response object, with resulting operation
+type ResponseOp a = GenericResponse OperationId a
+
+instance (FromJSON op, FromJSON a) => FromJSON (GenericResponse op a) where
     parseJSON = withObject "Response" $ \v -> Response
         <$> v .: "type"
         <*> v .: "status"
@@ -180,7 +197,7 @@ instance FromJSON Container where
         <*> v .: "status_code"
         <*> v .: "last_used_at"
 
--- | Configuration parameter to 'ExecRequest'.
+-- | Configuration parameter to 'ExecRequest' and 'ExecResponse'.
 data ExecParams = ExecImmediate               -- ^ Don't wait for a websocket connection before executing.
                 | ExecWebsocketInteractive    -- ^ Wait for websocket, allocate PTY.
                 | ExecWebsocketNonInteractive -- ^ Wait for websocket, don't allocate PTY.
@@ -267,11 +284,41 @@ type family ExecFds (params :: ExecParams) :: FdSet where
     ExecFds 'ExecWebsocketInteractive    = 'FdPty
     ExecFds 'ExecWebsocketNonInteractive = 'FdAll
 
+-- | Response of an exec request, configured using 'ExecParams' as type
+-- parameter.
+--
+-- Returned when querying @POST \/1.0\/containers\/\<name\>\/exec@.
+data ExecResponse (params :: ExecParams) = ExecResponse {
+    execResponseId :: String
+  , execResponseClass :: String
+  , execResponseCreatedAt :: String
+  , execResponseUpdatedAt :: String
+  , execResponseStatus :: String
+  , execResponseStatusCode :: Int
+  , execResponseMetadata :: ExecResponseMetadata params
+  , execResponseMayCancel :: Bool
+  , execResponseErr :: String
+}
+
+deriving instance Show (ExecResponseMetadata params) => Show (ExecResponse params)
+
+instance FromJSON (ExecResponseMetadata params) => FromJSON (ExecResponse (params :: ExecParams)) where
+    parseJSON = withObject "ExecResponse" $ \v -> ExecResponse
+        <$> v .: "id"
+        <*> v .: "class"
+        <*> v .: "created_at"
+        <*> v .: "updated_at"
+        <*> v .: "status"
+        <*> v .: "status_code"
+        <*> v .: "metadata"
+        <*> v .: "may_cancel"
+        <*> v .: "err"
+
 -- | Metadata of an immediate exec response.
 --
 -- Returned when querying @POST \/1.0\/containers\/\<name\>\/exec@ with
 -- 'ExecImmediate' as configuration.
-type ExecResponseImmediate = Value
+type ExecResponseMetadataImmediate = Value
 
 -- | Metadata of a websocket exec repsonse.
 --
@@ -281,23 +328,76 @@ type ExecResponseImmediate = Value
 --
 -- Paramtrized by a file descriptor set 'FdSet', see also the type family
 -- 'ExecFds'.
-newtype ExecResponseWebsocket fdset = ExecResponseWebsocket {
-    execResponseWebsocketFds :: Fds fdset
+newtype ExecResponseMetadataWebsocket fdset = ExecResponseMetadataWebsocket {
+    execResponseMetadataWebsocketFds :: Fds fdset
 } deriving (Show)
 
-instance FromJSON (ExecResponseWebsocket 'FdPty) where
-    parseJSON = withObject "ExecResponse 'FdPty" $ \v ->
-        ExecResponseWebsocket <$> v .: "fds"
+instance FromJSON (ExecResponseMetadataWebsocket 'FdPty) where
+    parseJSON = withObject "ExecResponseMetadata 'FdPty" $ \v ->
+        ExecResponseMetadataWebsocket <$> v .: "fds"
 
-instance FromJSON (ExecResponseWebsocket 'FdAll) where
-    parseJSON = withObject "ExecResponse 'FdAll" $ \v ->
-        ExecResponseWebsocket <$> v .: "fds"
+instance FromJSON (ExecResponseMetadataWebsocket 'FdAll) where
+    parseJSON = withObject "ExecResponseMetadata 'FdAll" $ \v ->
+        ExecResponseMetadataWebsocket <$> v .: "fds"
 
 -- | Type family converting an 'ExecParams' to the corresponding response type.
-type family ExecResponse (params :: ExecParams) :: * where
-    ExecResponse 'ExecImmediate               = ExecResponseImmediate
-    ExecResponse 'ExecWebsocketInteractive    = ExecResponseWebsocket 'FdPty
-    ExecResponse 'ExecWebsocketNonInteractive = ExecResponseWebsocket 'FdAll
+type family ExecResponseMetadata (params :: ExecParams) :: * where
+    ExecResponseMetadata 'ExecImmediate               = ExecResponseMetadataImmediate
+    ExecResponseMetadata 'ExecWebsocketInteractive    = ExecResponseMetadataWebsocket 'FdPty
+    ExecResponseMetadata 'ExecWebsocketNonInteractive = ExecResponseMetadataWebsocket 'FdAll
+
+-- | LXD operation identifier.
+newtype OperationId = OperationId String deriving (Eq, Show)
+
+instance FromJSON OperationId where
+    parseJSON = withText "OperationId" $ \text ->
+        let prefix = "/1.0/operations/" in
+        case stripPrefix prefix (unpack text) of
+            Nothing -> fail $ "could not parse operation id: no prefix " ++ prefix
+            Just operation -> return $ OperationId operation
+
+instance IsString OperationId where
+    fromString = OperationId
+
+instance ToHttpApiData OperationId where
+    toUrlPiece (OperationId operation) = pack operation
+
+-- | LXD operation status.
+type OperationStatus = String
+
+-- | LXD list of all operations.
+newtype AllOperations = AllOperations (Map OperationStatus [OperationId])
+                      deriving (Show)
+
+instance FromJSON AllOperations where
+    parseJSON v = AllOperations <$> parseJSON v
+
+-- | LXD operation.
+--
+-- Returned when querying @GET \/1.0\/operations\/\<uuid\>@.
+data Operation = Operation {
+    operationId :: String
+  , operationClass :: String
+  , operationCreatedAt :: String
+  , operationUpdatedAt :: String
+  , operationStatus :: OperationStatus
+  , operationStatusCode :: Int
+  , operationMetadata :: Value
+  , operationMayCancel :: Bool
+  , operationErr :: String
+} deriving (Show)
+
+instance FromJSON Operation where
+    parseJSON = withObject "Operation" $ \v -> Operation
+        <$> v .: "id"
+        <*> v .: "class"
+        <*> v .: "created_at"
+        <*> v .: "updated_at"
+        <*> v .: "status"
+        <*> v .: "status_code"
+        <*> v .: "metadata"
+        <*> v .: "may_cancel"
+        <*> v .: "err"
 
 -- | The type of a generic response object.
 data ResponseType = Sync | Async deriving (Eq, Show)

@@ -50,6 +50,7 @@ test-suite lxd-client-test
                      , Testing
   build-depends:       base
                      , lxd-client
+                     , containers
                      , data-default
                      , either
                      , mtl
