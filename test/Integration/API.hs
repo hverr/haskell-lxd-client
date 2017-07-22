@@ -18,8 +18,11 @@ apiTester = do
 
     testShow "testSupportedVersions"   testSupportedVersions
     testShow "testTrustedCertificates" testTrustedCertificates
-    testShow "testContainerNames"      testContainerNames
-    testShow "testContainer"           testContainer
+
+    testShow "testContainerNames" testContainerNames
+    testShow "testContainer"      testContainer
+
+    testShow "testContainerExecImmediate" testContainerExecImmediate
 
 connectToRemote :: MonadIO m => Bool -> Test m ApiConfig
 connectToRemote trusted = do
@@ -57,6 +60,12 @@ testContainer :: MonadIO m => Test m Container
 testContainer =
     runTrusted (container "test") >>= assertResponseOK
 
+testContainerExecImmediate :: MonadIO m => Test m ExecResponseImmediate
+testContainerExecImmediate =
+    runTrusted (containerExecImmediate "test" req) >>= assertResponseCreated
+  where
+    req = def { execRequestCommand = ["/bin/echo", "Hello, World!"] }
+
 trustedClient :: (MonadError String m, MonadIO m) => m ClientEnv
 trustedClient = remoteHostClient host
   where host = def { remoteHostHost = "127.0.0.1"
@@ -78,4 +87,9 @@ runTrusted action = do
 assertResponseOK :: Monad m => Response a -> Test m a
 assertResponseOK Response{..}
     | 200 <- statusCode = return metadata
-    | otherwise = throwError $ "Expected response with code 200 but got " ++ show statusCode ++ " with error code " ++ show errorCode ++ "(" ++ show error ++ ")"
+    | otherwise = throwError $ "Expected response with code 200 but got " ++ show statusCode ++ " with error code " ++ show errorCode ++ " (" ++ show error ++ ")"
+
+assertResponseCreated :: Monad m => Response a -> Test m a
+assertResponseCreated Response{..}
+    | 100 <- statusCode = return metadata
+    | otherwise = throwError $ "Exepected response with code 100 but got " ++ show statusCode

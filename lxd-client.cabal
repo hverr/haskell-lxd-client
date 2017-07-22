@@ -22,6 +22,7 @@ library
   build-depends:       base >= 4.7 && < 5
                      , aeson
                      , connection
+                     , containers
                      , data-default
                      , directory
                      , either
