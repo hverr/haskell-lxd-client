@@ -1,6 +1,24 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeOperators #-}
-module Network.LXD.Client.API where
+module Network.LXD.Client.API (
+  -- * API
+  -- ** Information
+  supportedVersions
+, apiConfig
+, trustedCertificates
+
+  -- ** Containers
+  -- *** Querying informaiton
+, containerNames
+, container
+  -- *** Executing commands
+, containerExecImmediate
+, containerExecWebsocketInteractive
+, containerExecWebsocketNonInteractive
+
+  -- * Helpers
+, ExecClient
+) where
 
 import Data.Proxy
 

@@ -6,7 +6,37 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
-module Network.LXD.Client.Types where
+module Network.LXD.Client.Types (
+  -- * Generic responses
+  Response(..)
+, ResponseType(..)
+  -- ** Background operations
+, BackgroundOperation(..)
+
+  -- * API
+, ApiConfig(..)
+, ApiStatus(..)
+, AuthStatus(..)
+, ApiVersion(..)
+
+  -- * Certificates
+, CertificateHash(..)
+
+  -- * Containers
+  -- ** Querying information
+, ContainerName(..)
+, Container(..)
+  -- ** Executing commands
+, ExecParams(..)
+, ExecRequest(..)
+, ExecResponseImmediate
+, ExecResponseWebsocket(..)
+, ExecResponse
+  -- ** Working with file descriptors
+, FdSet(..)
+, Fds(..)
+, ExecFds
+) where
 
 import Network.LXD.Prelude
 
@@ -67,7 +97,7 @@ instance FromJSON m => FromJSON (BackgroundOperation m) where
 
 -- | LXD API configuration object.
 --
--- Returend when querying GET /1.0. Some objects may not be present if
+-- Returend when querying @GET \/1.0@. Some objects may not be present if
 -- an untrusted requeset was made.
 data ApiConfig = ApiConfig {
     apiExtensions :: [String]
@@ -117,7 +147,7 @@ instance ToHttpApiData ContainerName where
 
 -- | LXD container information.
 --
--- Returned when querying GET /1.0/containers/<name>.
+-- Returned when querying @GET \/1.0\/containers\/\<name\>@.
 data Container = Container {
     containerArchitecture :: String
   , containerName :: String
@@ -156,7 +186,9 @@ data ExecParams = ExecImmediate               -- ^ Don't wait for a websocket co
                 | ExecWebsocketNonInteractive -- ^ Wait for websocket, don't allocate PTY.
                 deriving (Show)
 
--- | LXD container exec request.
+-- | LXD container exec request, configured using 'ExecParams' as type parameter.
+--
+-- Request body when querying @POST \/1.0\/containers\/\<name\>\/exec@.
 data ExecRequest (params :: ExecParams) = ExecRequest {
     execRequestCommand :: [String]
   , execRequestEnvironment :: Map String String
@@ -236,9 +268,19 @@ type family ExecFds (params :: ExecParams) :: FdSet where
     ExecFds 'ExecWebsocketNonInteractive = 'FdAll
 
 -- | Metadata of an immediate exec response.
+--
+-- Returned when querying @POST \/1.0\/containers\/\<name\>\/exec@ with
+-- 'ExecImmediate' as configuration.
 type ExecResponseImmediate = Value
 
 -- | Metadata of a websocket exec repsonse.
+--
+-- Returned when querying @POST \/1.0\/containers\/\<name\>\/exec@ with
+-- 'ExecWebsocketInteractive' or 'ExecWebsocketNonInteractive' as
+-- configuration.
+--
+-- Paramtrized by a file descriptor set 'FdSet', see also the type family
+-- 'ExecFds'.
 newtype ExecResponseWebsocket fdset = ExecResponseWebsocket {
     execResponseWebsocketFds :: Fds fdset
 } deriving (Show)
@@ -257,6 +299,7 @@ type family ExecResponse (params :: ExecParams) :: * where
     ExecResponse 'ExecWebsocketInteractive    = ExecResponseWebsocket 'FdPty
     ExecResponse 'ExecWebsocketNonInteractive = ExecResponseWebsocket 'FdAll
 
+-- | The type of a generic response object.
 data ResponseType = Sync | Async deriving (Eq, Show)
 
 instance FromJSON ResponseType where
