@@ -38,6 +38,7 @@ module Network.LXD.Client.Types (
 , ExecResponseMetadataWebsocket(..)
 , ExecResponseMetadata
   -- ** Working with file descriptors
+, Secret(..)
 , FdSet(..)
 , Fds(..)
 , ExecFds
@@ -253,17 +254,23 @@ instance ToJSON (ExecRequest 'ExecWebsocketNonInteractive) where
       , "height" .= execRequestHeight
       ]
 
+-- | A secret used to connect to a websocket.
+newtype Secret = Secret String deriving (Eq, Show)
+
+instance FromJSON Secret where
+    parseJSON = withText "Secret" $ return . Secret . unpack
+
 -- | A set of selected file descriptors.
 data FdSet = FdAll | FdPty deriving (Show)
 
 -- | A set of file descriptors.
 data Fds set where
-    FdsAll :: { fdsAllStdin :: String
-              , fdsAllStdout :: String
-              , fdsAllStderr :: String
-              , fdsAllControl :: String } -> Fds 'FdAll
-    FdsPty :: { fdsPty :: String
-              , fdsPtyControl :: String } -> Fds 'FdPty
+    FdsAll :: { fdsAllStdin :: Secret
+              , fdsAllStdout :: Secret
+              , fdsAllStderr :: Secret
+              , fdsAllControl :: Secret } -> Fds 'FdAll
+    FdsPty :: { fdsPty :: Secret
+              , fdsPtyControl :: Secret } -> Fds 'FdPty
 
 deriving instance Show (Fds set)
 

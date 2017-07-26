@@ -21,18 +21,29 @@ module Network.LXD.Client.API (
 , operation
 , operationCancel
 , operationWait
+, operationWebSocket
+
+  -- ** WebSocket communciations
+, readWebSocket
+, readByteStringWebSocket
 
   -- * Helpers
 , ExecClient
 ) where
 
+import Network.LXD.Prelude
+
+import Control.Exception (catch, throwIO)
+
 import Data.Aeson (Value)
+import Data.ByteString.Lazy (ByteString)
 import Data.Proxy
 
 import Servant.API
 import Servant.Client
 
 import Network.LXD.Client.Types
+import qualified Network.WebSockets as WS
 
 type API = Get '[JSON] (Response [ApiVersion])
       :<|> "1.0" :> Get '[JSON] (Response ApiConfig)
@@ -77,6 +88,25 @@ supportedVersions                        :<|>
     operationCancel                      :<|>
     operationWait
     = client api
+
+operationWebSocket :: OperationId -> Secret -> String
+operationWebSocket (OperationId oid) (Secret secret) =
+    "/1.0/operations/" ++ oid ++ "/websocket?secret=" ++ secret
+
+readWebSocket :: (Maybe WS.DataMessage -> IO ()) -> WS.ClientApp ()
+readWebSocket f con = do
+    m <- (Just <$> WS.receiveDataMessage con) `catch` handle'
+    f m
+    case m of Nothing -> return ()
+              Just _  -> readWebSocket f con
+  where
+    handle' (WS.CloseRequest _ _) = return Nothing
+    handle' e                     = throwIO e
+
+readByteStringWebSocket :: (Maybe ByteString -> IO ()) -> WS.ClientApp ()
+readByteStringWebSocket f = readWebSocket (f . (conv <$>))
+  where conv (WS.Text bs)   = bs
+        conv (WS.Binary bs) = bs
 
 type ExecAPI a = "1.0" :> "containers" :> Capture "name" ContainerName :> "exec" :> ReqBody '[JSON] (ExecRequest a) :> Post '[JSON] (ResponseOp (ExecResponse a))
 
