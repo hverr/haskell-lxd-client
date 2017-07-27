@@ -16,6 +16,9 @@ module Network.LXD.Client.API (
 , containerExecWebsocketInteractive
 , containerExecWebsocketNonInteractive
 
+  -- ** Images
+, imageIds
+
   -- ** Operations
 , operationIds
 , operation
@@ -55,6 +58,7 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> ExecAPI 'ExecImmediate
       :<|> ExecAPI 'ExecWebsocketInteractive
       :<|> ExecAPI 'ExecWebsocketNonInteractive
+      :<|> "1.0" :> "images" :> Get '[JSON] (Response [ImageId])
       :<|> "1.0" :> "operations" :> Get '[JSON] (Response AllOperations)
       :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Get '[JSON] (Response Operation)
       :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Delete '[JSON] (Response Value)
@@ -72,6 +76,7 @@ container                            :: ContainerName -> ClientM (Response Conta
 containerExecImmediate               :: ExecClient 'ExecImmediate
 containerExecWebsocketInteractive    :: ExecClient 'ExecWebsocketInteractive
 containerExecWebsocketNonInteractive :: ExecClient 'ExecWebsocketNonInteractive
+imageIds                             :: ClientM (Response [ImageId])
 operationIds                         :: ClientM (Response AllOperations)
 operation                            :: OperationId -> ClientM (Response Operation)
 operationCancel                      :: OperationId -> ClientM (Response Value)
@@ -85,6 +90,7 @@ supportedVersions                        :<|>
     containerExecImmediate               :<|>
     containerExecWebsocketInteractive    :<|>
     containerExecWebsocketNonInteractive :<|>
+    imageIds                             :<|>
     operationIds                         :<|>
     operation                            :<|>
     operationCancel                      :<|>

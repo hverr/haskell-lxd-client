@@ -43,6 +43,9 @@ module Network.LXD.Client.Types (
 , Fds(..)
 , ExecFds
 
+  -- * Images
+, ImageId(..)
+
   -- * Operations
 , OperationId(..)
 , OperationStatus
@@ -352,6 +355,16 @@ type family ExecResponseMetadata (params :: ExecParams) :: * where
     ExecResponseMetadata 'ExecImmediate               = ExecResponseMetadataImmediate
     ExecResponseMetadata 'ExecWebsocketInteractive    = ExecResponseMetadataWebsocket 'FdPty
     ExecResponseMetadata 'ExecWebsocketNonInteractive = ExecResponseMetadataWebsocket 'FdAll
+
+-- | LXD image identifier.
+newtype ImageId = ImageId String deriving (Eq, Show)
+
+instance FromJSON ImageId where
+    parseJSON = withText "ImageId" $ \text ->
+        let prefix = "/1.0/images/" in
+        case stripPrefix prefix (unpack text) of
+            Nothing -> fail $ "could not parse image id: no prefix " ++ prefix
+            Just img -> return $ ImageId img
 
 -- | LXD operation identifier.
 newtype OperationId = OperationId String deriving (Eq, Show)

@@ -33,6 +33,8 @@ apiTester = do
 
     testShow "testContainerExecImmediate" testContainerExecImmediate
 
+    testShow "testImageIds" testImageIds
+
     testShow "testOperationIds"    testOperationIds
     testShow "testOperation"       testOperation
 
@@ -80,6 +82,12 @@ testContainerExecImmediate =
     runTrusted (containerExecImmediate "test" req) >>= assertResponseCreated
   where
     req = def { execRequestCommand = ["/bin/echo", "Hello, World!"] }
+
+testImageIds :: MonadIO m => Test m [ImageId]
+testImageIds = do
+    ids <- runTrusted imageIds >>= assertResponseOK
+    assertNotEq ids []
+    return ids
 
 testOperationIds :: MonadIO m => Test m AllOperations
 testOperationIds =
