@@ -48,6 +48,7 @@ module Network.LXD.Client.Types (
 , Image(..)
 , ImageAlias(..)
 , ImageProperties(..)
+, ImageAliasName(..)
 
   -- * Operations
 , OperationId(..)
@@ -402,7 +403,7 @@ instance FromJSON ImageProperties where
 --
 -- Returned when querying @GET \/1.0\/images\/\<fingerprint\>@.
 data Image = Image {
-    imageAliases :: [ImageAlias]
+    imageAllAliases :: [ImageAlias]
   , imageArchitecture :: String
   , imageAutoUpdate :: Bool
   , imageCached :: Bool
@@ -416,6 +417,18 @@ data Image = Image {
   , imageLastUsedAt :: String
   , imageUplaodedAt :: String
   } deriving (Show)
+
+-- | LXD alias name.
+--
+-- Returned when querying @GET \/1.0\/images/aliases@.
+newtype ImageAliasName = ImageAliasName String deriving (Eq, Show)
+
+instance FromJSON ImageAliasName where
+    parseJSON = withText "ImageAliasName" $ \text ->
+        let prefix = "/1.0/images/aliases/" in
+        case stripPrefix prefix (unpack text) of
+            Nothing -> fail $ "could not parse image alias name id: no prefix " ++ prefix
+            Just name -> return $ ImageAliasName name
 
 instance FromJSON Image where
     parseJSON = withObject "Image" $ \v -> Image

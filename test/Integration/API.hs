@@ -34,8 +34,9 @@ apiTester = do
 
     testShow "testContainerExecImmediate" testContainerExecImmediate
 
-    testShow "testImageIds" testImageIds
-    testShow "testImage"    testImage
+    testShow "testImageIds"     testImageIds
+    testShow "testImageAliases" testImageAliases
+    testShow "testImage"        testImage
 
     testShow "testOperationIds"    testOperationIds
     testShow "testOperation"       testOperation
@@ -90,6 +91,12 @@ testImageIds = do
     ids <- runTrusted imageIds >>= assertResponseOK
     assertNotEq ids []
     return ids
+
+testImageAliases :: MonadIO m => Test m [ImageAliasName]
+testImageAliases = do
+    v <- runTrusted imageAliases >>= assertResponseOK
+    assertNotEq v []
+    return v
 
 testImage :: MonadIO m => Test m [Image]
 testImage = do
