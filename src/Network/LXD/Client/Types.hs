@@ -45,6 +45,9 @@ module Network.LXD.Client.Types (
 
   -- * Images
 , ImageId(..)
+, Image(..)
+, ImageAlias(..)
+, ImageProperties(..)
 
   -- * Operations
 , OperationId(..)
@@ -365,6 +368,70 @@ instance FromJSON ImageId where
         case stripPrefix prefix (unpack text) of
             Nothing -> fail $ "could not parse image id: no prefix " ++ prefix
             Just img -> return $ ImageId img
+
+instance ToHttpApiData ImageId where
+    toUrlPiece (ImageId img) = pack img
+
+-- | Alias of an image.
+data ImageAlias = ImageAlias {
+    imageAliasName :: String
+  , imageAliasDescription :: String
+  } deriving (Show)
+
+instance FromJSON ImageAlias where
+    parseJSON = withObject "ImageAlias" $ \v -> ImageAlias
+        <$> v .: "name"
+        <*> v .: "description"
+
+-- | Properties of an image.
+data ImageProperties = ImageProperties {
+    imagePropertiesArchitecture :: Maybe String
+  , imagePropertiesDescription :: String
+  , imagePropertiesOs :: Maybe String
+  , imagePropertiesRelease :: Maybe String
+  } deriving (Show)
+
+instance FromJSON ImageProperties where
+    parseJSON = withObject "ImageProperties" $ \v -> ImageProperties
+        <$> v .:? "architecture"
+        <*> v .:  "description"
+        <*> v .:? "os"
+        <*> v .:? "release"
+
+-- | LXD image information.
+--
+-- Returned when querying @GET \/1.0\/images\/\<fingerprint\>@.
+data Image = Image {
+    imageAliases :: [ImageAlias]
+  , imageArchitecture :: String
+  , imageAutoUpdate :: Bool
+  , imageCached :: Bool
+  , imageFingerprint :: String
+  , imageFilename :: String
+  , imageProperties :: ImageProperties
+  , imagePublic :: Bool
+  , imageSize :: Integer
+  , imageCreatedAt :: String
+  , imageExpiresAt :: String
+  , imageLastUsedAt :: String
+  , imageUplaodedAt :: String
+  } deriving (Show)
+
+instance FromJSON Image where
+    parseJSON = withObject "Image" $ \v -> Image
+        <$> v .: "aliases"
+        <*> v .: "architecture"
+        <*> v .: "auto_update"
+        <*> v .: "cached"
+        <*> v .: "fingerprint"
+        <*> v .: "filename"
+        <*> v .: "properties"
+        <*> v .: "public"
+        <*> v .: "size"
+        <*> v .: "created_at"
+        <*> v .: "expires_at"
+        <*> v .: "last_used_at"
+        <*> v .: "uploaded_at"
 
 -- | LXD operation identifier.
 newtype OperationId = OperationId String deriving (Eq, Show)

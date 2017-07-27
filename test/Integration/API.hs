@@ -8,6 +8,7 @@ import Testing
 
 import Control.Concurrent (newEmptyMVar, newMVar, putMVar, takeMVar, modifyMVar_)
 import Control.Concurrent.Async (async, wait)
+import Control.Monad ((>=>))
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Except (runExceptT)
 
@@ -34,6 +35,7 @@ apiTester = do
     testShow "testContainerExecImmediate" testContainerExecImmediate
 
     testShow "testImageIds" testImageIds
+    testShow "testImage"    testImage
 
     testShow "testOperationIds"    testOperationIds
     testShow "testOperation"       testOperation
@@ -88,6 +90,13 @@ testImageIds = do
     ids <- runTrusted imageIds >>= assertResponseOK
     assertNotEq ids []
     return ids
+
+testImage :: MonadIO m => Test m [Image]
+testImage = do
+    ids    <- runTrusted imageIds >>= assertResponseOK
+    images <- mapM (runTrusted . image >=> assertResponseOK) ids
+    assertEq (length ids) (length images)
+    return images
 
 testOperationIds :: MonadIO m => Test m AllOperations
 testOperationIds =
