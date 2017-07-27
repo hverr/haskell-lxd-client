@@ -24,8 +24,8 @@ module Network.LXD.Client.API (
 , operationWebSocket
 
   -- ** WebSocket communciations
-, readWebSocket
-, readByteStringWebSocket
+, readAllWebSocket
+, writeAllWebSocket
 
   -- * Helpers
 , ExecClient
@@ -33,11 +33,13 @@ module Network.LXD.Client.API (
 
 import Network.LXD.Prelude
 
+import Control.Concurrent (MVar, takeMVar)
 import Control.Exception (catch, throwIO)
 
 import Data.Aeson (Value)
 import Data.ByteString.Lazy (ByteString)
 import Data.Proxy
+import qualified Data.ByteString.Lazy as BL
 
 import Servant.API
 import Servant.Client
@@ -93,20 +95,24 @@ operationWebSocket :: OperationId -> Secret -> String
 operationWebSocket (OperationId oid) (Secret secret) =
     "/1.0/operations/" ++ oid ++ "/websocket?secret=" ++ secret
 
-readWebSocket :: (Maybe WS.DataMessage -> IO ()) -> WS.ClientApp ()
-readWebSocket f con = do
+readAllWebSocket :: (ByteString -> IO ()) -> WS.ClientApp ()
+readAllWebSocket f con = do
     m <- (Just <$> WS.receiveDataMessage con) `catch` handle'
-    f m
-    case m of Nothing -> return ()
-              Just _  -> readWebSocket f con
+    case m of Nothing             -> return ()
+              Just (WS.Text _)    -> WS.sendClose con BL.empty
+              Just (WS.Binary bs) -> f bs
+                                  >> readAllWebSocket f con
   where
     handle' (WS.CloseRequest _ _) = return Nothing
     handle' e                     = throwIO e
 
-readByteStringWebSocket :: (Maybe ByteString -> IO ()) -> WS.ClientApp ()
-readByteStringWebSocket f = readWebSocket (f . (conv <$>))
-  where conv (WS.Text bs)   = bs
-        conv (WS.Binary bs) = bs
+writeAllWebSocket :: MVar (Maybe ByteString) -> WS.ClientApp ()
+writeAllWebSocket input con = do
+    i <- takeMVar input
+    case i of
+        Nothing -> WS.sendClose con BL.empty
+        Just bs -> WS.sendBinaryData con bs
+                >> writeAllWebSocket input con
 
 type ExecAPI a = "1.0" :> "containers" :> Capture "name" ContainerName :> "exec" :> ReqBody '[JSON] (ExecRequest a) :> Post '[JSON] (ResponseOp (ExecResponse a))
 

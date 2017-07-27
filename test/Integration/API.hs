@@ -6,9 +6,14 @@ module Integration.API where
 import Network.LXD.Prelude
 import Testing
 
-import Control.Monad.Trans.Maybe
+import Control.Concurrent (newEmptyMVar, newMVar, putMVar, takeMVar, modifyMVar_)
+import Control.Concurrent.Async (async, wait)
+import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
+import Control.Monad.Except (runExceptT)
 
 import Data.Default (def)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map.Strict as Map
 
 import Servant.Client (ClientEnv, ClientM, runClientM)
@@ -30,6 +35,8 @@ apiTester = do
 
     testShow "testOperationIds"    testOperationIds
     testShow "testOperation"       testOperation
+
+    testShow "testExecHelloWorld" testExecHelloWorld
 
 
 connectToRemote :: MonadIO m => Bool -> Test m ApiConfig
@@ -92,10 +99,49 @@ testOperation = runMaybeT $
        Just []    -> MaybeT (return Nothing)
        Just (x:_) -> return x
 
+testExecHelloWorld :: MonadIO m => Test m String
+testExecHelloWorld = do
+    resp <- runTrusted (containerExecWebsocketNonInteractive "test" req)
+    md   <- assertResponseCreated resp
+    let oid = responseOperation resp
+    let fds = execResponseMetadataWebsocketFds (execResponseMetadata md)
+    let stdout = operationWebSocket oid (fdsAllStdout fds)
+    let stderr = operationWebSocket oid (fdsAllStderr fds)
+    let stdin  = operationWebSocket oid (fdsAllStdin fds)
+
+    input <- liftIO newEmptyMVar
+    output <- liftIO $ newMVar BL.empty
+
+    stdoutThread <- async' $ runWebSockets trustedHost stdout (readAllWebSocket (save' output))
+    stderrThread <- async' $ runWebSockets trustedHost stderr (readAllWebSocket BL.putStr)
+    stdinThread  <- async' $ runWebSockets trustedHost stdin  (writeAllWebSocket input)
+
+    wait' stdoutThread >>= assertEither
+    wait' stderrThread >>= assertEither
+
+    liftIO $ putMVar input Nothing
+    wait' stdinThread  >>= assertEither
+
+    output' <- liftIO $ BL.toStrict <$> takeMVar output
+    assertTrue ("Hello World" `BS.isInfixOf` output') "\"Hello World\" not present in output"
+    return $ show output'
+  where
+    req = def { execRequestCommand = ["/bin/echo", "Hello World"] }
+
+    save' output bs = do
+        BL.putStr bs
+        modifyMVar_ output $ \bs' -> return (bs' `BL.append` bs)
+
+    async' = liftIO . async . runExceptT
+    wait' = liftIO . wait
+
+
 trustedClient :: (MonadError String m, MonadIO m) => m ClientEnv
-trustedClient = remoteHostClient host
-  where host = def { remoteHostHost = "127.0.0.1"
-                   , remoteHostClientKey = DefaultClientAuth }
+trustedClient = remoteHostClient trustedHost
+
+trustedHost :: RemoteHost
+trustedHost = def { remoteHostHost = "127.0.0.1"
+                  , remoteHostClientKey = DefaultClientAuth }
 
 untrustedClient :: (MonadError String m, MonadIO m) => m ClientEnv
 untrustedClient = remoteHostClient host
