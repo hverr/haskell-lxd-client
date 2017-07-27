@@ -36,6 +36,7 @@ apiTester = do
 
     testShow "testImageIds"     testImageIds
     testShow "testImageAliases" testImageAliases
+    testShow "testImageAlias"   testImageAlias
     testShow "testImage"        testImage
 
     testShow "testOperationIds"    testOperationIds
@@ -97,6 +98,13 @@ testImageAliases = do
     v <- runTrusted imageAliases >>= assertResponseOK
     assertNotEq v []
     return v
+
+testImageAlias :: MonadIO m => Test m [ImageAlias]
+testImageAlias = do
+    v       <- runTrusted imageAliases >>= assertResponseOK
+    aliases <- mapM (runTrusted . imageAlias >=> assertResponseOK) v
+    assertEq (length v) (length aliases)
+    return aliases
 
 testImage :: MonadIO m => Test m [Image]
 testImage = do

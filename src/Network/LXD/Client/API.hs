@@ -19,6 +19,7 @@ module Network.LXD.Client.API (
   -- ** Images
 , imageIds
 , imageAliases
+, imageAlias
 , image
 
   -- ** Operations
@@ -62,6 +63,7 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> ExecAPI 'ExecWebsocketNonInteractive
       :<|> "1.0" :> "images" :> Get '[JSON] (Response [ImageId])
       :<|> "1.0" :> "images" :> "aliases" :> Get '[JSON] (Response [ImageAliasName])
+      :<|> "1.0" :> "images" :> "aliases" :> Capture "name" ImageAliasName :> Get '[JSON] (Response ImageAlias)
       :<|> "1.0" :> "images" :> Capture "id" ImageId :> Get '[JSON] (Response Image)
       :<|> "1.0" :> "operations" :> Get '[JSON] (Response AllOperations)
       :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Get '[JSON] (Response Operation)
@@ -82,6 +84,7 @@ containerExecWebsocketInteractive    :: ExecClient 'ExecWebsocketInteractive
 containerExecWebsocketNonInteractive :: ExecClient 'ExecWebsocketNonInteractive
 imageIds                             :: ClientM (Response [ImageId])
 imageAliases                         :: ClientM (Response [ImageAliasName])
+imageAlias                           :: ImageAliasName -> ClientM (Response ImageAlias)
 image                                :: ImageId -> ClientM (Response Image)
 operationIds                         :: ClientM (Response AllOperations)
 operation                            :: OperationId -> ClientM (Response Operation)
@@ -98,6 +101,7 @@ supportedVersions                        :<|>
     containerExecWebsocketNonInteractive :<|>
     imageIds                             :<|>
     imageAliases                         :<|>
+    imageAlias                           :<|>
     image                                :<|>
     operationIds                         :<|>
     operation                            :<|>

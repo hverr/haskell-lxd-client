@@ -374,15 +374,20 @@ instance ToHttpApiData ImageId where
     toUrlPiece (ImageId img) = pack img
 
 -- | Alias of an image.
+--
+-- Returned when querying @GET \/1.0\/images/aliases\/\<name\>@,
+-- and as a part of @GET \/1.0\/images\/\<fingerprint\>@.
 data ImageAlias = ImageAlias {
     imageAliasName :: String
   , imageAliasDescription :: String
+  , imageAliasTarget :: Maybe String
   } deriving (Show)
 
 instance FromJSON ImageAlias where
     parseJSON = withObject "ImageAlias" $ \v -> ImageAlias
         <$> v .: "name"
         <*> v .: "description"
+        <*> v .:? "target"
 
 -- | Properties of an image.
 data ImageProperties = ImageProperties {
@@ -429,6 +434,9 @@ instance FromJSON ImageAliasName where
         case stripPrefix prefix (unpack text) of
             Nothing -> fail $ "could not parse image alias name id: no prefix " ++ prefix
             Just name -> return $ ImageAliasName name
+
+instance ToHttpApiData ImageAliasName where
+    toUrlPiece (ImageAliasName name) = pack name
 
 instance FromJSON Image where
     parseJSON = withObject "Image" $ \v -> Image
