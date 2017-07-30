@@ -32,10 +32,8 @@ module Network.LXD.Client.Types (
 , Container(..)
   -- ** Creating containers
 , ContainerCreateRequest(..)
+, containerCreateRequest
 , ContainerSource(..)
-, ImageSourceLocalByAlias(..)
-, ImageSourceLocalByFingerprint(..)
-, ImageSourceRemote(..)
   -- ** Deleting containers
 , ContainerDeleteRequest(..)
   -- ** Executing commands
@@ -50,13 +48,27 @@ module Network.LXD.Client.Types (
 , FdSet(..)
 , Fds(..)
 , ExecFds
+  -- ** Referencing containers
+, LocalContainer(..)
 
   -- * Images
+  -- ** Querying information
 , ImageId(..)
 , Image(..)
 , ImageAlias(..)
+, defaultImageAlias
 , ImageProperties(..)
 , ImageAliasName(..)
+  -- ** Creating and publishing new images
+, ImageCreateRequest(..)
+, imageCreateRequest
+, ImageSource(..)
+  -- ** Deleting images
+, ImageDeleteRequest(..)
+  -- ** Referencing images
+, LocalImageByAlias(..)
+, LocalImageByFingerprint(..)
+, RemoteImage(..)
 
   -- * Operations
 , OperationId(..)
@@ -173,6 +185,9 @@ instance FromJSON ContainerName where
             Nothing -> fail $ "could not parse container name: no prefix " ++ prefix
             Just name -> return $ ContainerName name
 
+instance ToJSON ContainerName where
+    toJSON (ContainerName name) = toJSON name
+
 instance IsString ContainerName where
     fromString = ContainerName
 
@@ -241,55 +256,67 @@ instance ToJSON ContainerCreateRequest where
         (.=) <$> pure "instance_type" <*> containerCreateRequestInstanceType
       ]
 
+-- | Create a default 'ContainerCreateRequest'.
+containerCreateRequest :: String -> ContainerSource -> ContainerCreateRequest
+containerCreateRequest name src = ContainerCreateRequest {
+    containerCreateRequestName = name
+  , containerCreateRequestArchitecture = "x86_64"
+  , containerCreateRequestProfiles = ["default"]
+  , containerCreateRequestEphemeral = False
+  , containerCreateRequestConfig = object []
+  , containerCreateRequestDevices = object []
+  , containerCreateRequestInstanceType = Nothing
+  , containerCreateRequestSource = src
+  }
+
 -- | Source for creating a container, as used by 'ContainerCreateRequest'.
-data ContainerSource = ContainerSourceLocalByAlias ImageSourceLocalByAlias             -- ^ Container based on a local image with a certain alias.
-                     | ContainerSourceLocalByFingerprint ImageSourceLocalByFingerprint -- ^ Container based on a local image with a certain alias.
+data ContainerSource = ContainerSourceLocalByAlias LocalImageByAlias             -- ^ Container based on a local image with a certain alias.
+                     | ContainerSourceLocalByFingerprint LocalImageByFingerprint -- ^ Container based on a local image with a certain alias.
                      | ContainerSourceNone                                             -- ^ Container without a pre-populated rootfs.
-                     | ContainerSourceRemote ImageSourceRemote                         -- ^ Continer based on a public remote image.
+                     | ContainerSourceRemote RemoteImage                         -- ^ Continer based on a public remote image.
                      deriving (Show)
 
 instance ToJSON ContainerSource where
-    toJSON (ContainerSourceLocalByAlias (ImageSourceLocalByAlias alias)) = object [
+    toJSON (ContainerSourceLocalByAlias (LocalImageByAlias alias)) = object [
         "type" .= ("image" :: String)
       , "alias" .= alias
       ]
-    toJSON (ContainerSourceLocalByFingerprint (ImageSourceLocalByFingerprint img)) = object [
+    toJSON (ContainerSourceLocalByFingerprint (LocalImageByFingerprint img)) = object [
         "type" .= ("image" :: String)
       , "fingerprint" .= img
       ]
     toJSON ContainerSourceNone = object [
         "type" .= ("none" :: String)
       ]
-    toJSON (ContainerSourceRemote ImageSourceRemote{..}) = object $ [
+    toJSON (ContainerSourceRemote RemoteImage{..}) = object $ [
         "type" .= ("image" :: String)
       , "mode" .= ("pull" :: String)
-      , "server" .= imageSourceRemoteServer
-      , "alias" .= imageSourceRemoteAlias
+      , "server" .= remoteImageServer
       ] ++ catMaybes [
-        (.=) <$> pure "secret" <*> imageSourceRemoteSecret
-      , (.=) <$> pure "certificate" <*> imageSourceRemoteCertificate
-      , (.=) <$> pure "alias" <*> imageSourceRemoteAlias
-      , (.=) <$> pure "fingerprint" <*> imageSourceRemoteFingerprint
+        (.=) <$> pure "secret" <*> remoteImageSecret
+      , (.=) <$> pure "certificate" <*> remoteImageCertificate
+      , (.=) <$> pure "alias" <*> remoteImageAlias
+      , (.=) <$> pure "fingerprint" <*> remoteImageFingerprint
       ]
       where
-        imageSourceRemoteAlias = either Just (const Nothing) imageSourceRemoteAliasOrFingerprint :: Maybe ImageAliasName
-        imageSourceRemoteFingerprint = either (const Nothing) Just imageSourceRemoteAliasOrFingerprint :: Maybe ImageId
+        remoteImageAlias = either Just (const Nothing) remoteImageAliasOrFingerprint :: Maybe ImageAliasName
+        remoteImageFingerprint = either (const Nothing) Just remoteImageAliasOrFingerprint :: Maybe ImageId
 
 -- | Source for a local image, specified by its alias.
-newtype ImageSourceLocalByAlias = ImageSourceLocalByAlias ImageAliasName deriving (Show)
+newtype LocalImageByAlias = LocalImageByAlias ImageAliasName deriving (Show)
 
-instance IsString ImageSourceLocalByAlias where
-    fromString = ImageSourceLocalByAlias . ImageAliasName
+instance IsString LocalImageByAlias where
+    fromString = LocalImageByAlias . ImageAliasName
 
 -- | Source for a local image, specified by its fingerprint
-newtype ImageSourceLocalByFingerprint = ImageSourceLocalByFingerprint ImageId deriving (Show)
+newtype LocalImageByFingerprint = LocalImageByFingerprint ImageId deriving (Show)
 
 -- | Source for an image from a public or private remote.
-data ImageSourceRemote = ImageSourceRemote {
-    imageSourceRemoteServer :: String
-  , imageSourceRemoteSecret :: Maybe String
-  , imageSourceRemoteCertificate :: Maybe String
-  , imageSourceRemoteAliasOrFingerprint :: Either ImageAliasName ImageId
+data RemoteImage = RemoteImage {
+    remoteImageServer :: String
+  , remoteImageSecret :: Maybe String
+  , remoteImageCertificate :: Maybe String
+  , remoteImageAliasOrFingerprint :: Either ImageAliasName ImageId
   } deriving (Show)
 
 -- | LXD delete container request object.
@@ -458,6 +485,12 @@ type family ExecResponseMetadata (params :: ExecParams) :: * where
     ExecResponseMetadata 'ExecWebsocketInteractive    = ExecResponseMetadataWebsocket 'FdPty
     ExecResponseMetadata 'ExecWebsocketNonInteractive = ExecResponseMetadataWebsocket 'FdAll
 
+-- | Reference to a local container, as used by 'ImageSource'.
+newtype LocalContainer = LocalContainer ContainerName deriving (Show)
+
+instance IsString LocalContainer where
+    fromString = LocalContainer . ContainerName
+
 -- | LXD image identifier.
 newtype ImageId = ImageId String deriving (Eq, Show)
 
@@ -490,10 +523,24 @@ instance FromJSON ImageAlias where
         <*> v .: "description"
         <*> v .:? "target"
 
+instance ToJSON ImageAlias where
+    toJSON ImageAlias{..} = object [
+        "name" .= imageAliasName
+      , "description" .= imageAliasDescription
+      ]
+
+-- | Create a default 'ImageAlias', with empty description and target.
+defaultImageAlias :: String -> ImageAlias
+defaultImageAlias name = ImageAlias {
+    imageAliasName = name
+  , imageAliasDescription = ""
+  , imageAliasTarget = Nothing
+  }
+
 -- | Properties of an image.
 data ImageProperties = ImageProperties {
     imagePropertiesArchitecture :: Maybe String
-  , imagePropertiesDescription :: String
+  , imagePropertiesDescription :: Maybe String
   , imagePropertiesOs :: Maybe String
   , imagePropertiesRelease :: Maybe String
   } deriving (Show)
@@ -501,7 +548,7 @@ data ImageProperties = ImageProperties {
 instance FromJSON ImageProperties where
     parseJSON = withObject "ImageProperties" $ \v -> ImageProperties
         <$> v .:? "architecture"
-        <*> v .:  "description"
+        <*> v .:?  "description"
         <*> v .:? "os"
         <*> v .:? "release"
 
@@ -560,6 +607,71 @@ instance FromJSON Image where
         <*> v .: "expires_at"
         <*> v .: "last_used_at"
         <*> v .: "uploaded_at"
+
+-- | LXD image create request object.
+--
+-- Used when querying @POST \/1.0\/images@.
+data ImageCreateRequest = ImageCreateRequest {
+    imageCreateRequestPublic :: Bool
+  , imageCreateRequestAutoUpdate :: Bool
+  , imageCreateRequestProperties :: Value
+  , imageCreateRequestAliases :: [ImageAlias]
+  , imageCreateRequestSource :: ImageSource
+  } deriving (Show)
+
+-- | Construct a new default 'ImageCreateRequest'.
+imageCreateRequest :: ImageSource -> ImageCreateRequest
+imageCreateRequest src = ImageCreateRequest {
+    imageCreateRequestPublic = False
+  , imageCreateRequestAutoUpdate = False
+  , imageCreateRequestProperties = object []
+  , imageCreateRequestAliases = []
+  , imageCreateRequestSource = src
+  }
+
+instance ToJSON ImageCreateRequest where
+    toJSON ImageCreateRequest{..} = object [
+        "public" .= imageCreateRequestPublic
+      , "auto_update" .= imageCreateRequestAutoUpdate
+      , "properties" .= imageCreateRequestProperties
+      , "aliases" .= imageCreateRequestAliases
+      , "source" .= imageCreateRequestSource
+      ]
+
+-- | A generic image source, used by 'ImageCreateRequest'.
+data ImageSource = ImageSourceRemoteImage RemoteImage
+                 | ImageSourceLocalContainer LocalContainer
+                 deriving (Show)
+
+instance ToJSON ImageSource where
+    toJSON (ImageSourceLocalContainer (LocalContainer name)) = object [
+        "type" .= ("container" :: String)
+      , "name" .= name
+      ]
+    toJSON (ImageSourceRemoteImage RemoteImage{..}) = object $ [
+        "type" .= ("image" :: String)
+      , "mode" .= ("pull" :: String)
+      , "server" .= remoteImageServer
+      ] ++ catMaybes [
+        (.=) <$> pure "secret" <*> remoteImageSecret
+      , (.=) <$> pure "certificate" <*> remoteImageCertificate
+      , (.=) <$> pure "alias" <*> remoteImageAlias
+      , (.=) <$> pure "fingerprint" <*> remoteImageFingerprint
+      ]
+      where
+        remoteImageAlias = either Just (const Nothing) remoteImageAliasOrFingerprint :: Maybe ImageAliasName
+        remoteImageFingerprint = either (const Nothing) Just remoteImageAliasOrFingerprint :: Maybe ImageId
+
+-- | LXD image delete request object.
+--
+-- Used when querying @DELETE \/1.0\/images\/\<fingerprint\>@.
+data ImageDeleteRequest = ImageDeleteRequest
+
+instance Default ImageDeleteRequest where
+    def = ImageDeleteRequest
+
+instance ToJSON ImageDeleteRequest where
+    toJSON _ = object []
 
 -- | LXD operation identifier.
 newtype OperationId = OperationId String deriving (Eq, Show)

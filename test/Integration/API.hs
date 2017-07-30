@@ -14,6 +14,7 @@ import Control.Monad.Except (runExceptT)
 
 import Data.Aeson (object)
 import Data.Default (def)
+import Data.Maybe (fromJust)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Map.Strict as Map
@@ -36,10 +37,11 @@ apiTester = do
 
     testShow "testContainerExecImmediate" testContainerExecImmediate
 
-    testShow "testImageIds"     testImageIds
-    testShow "testImageAliases" testImageAliases
-    testShow "testImageAlias"   testImageAlias
-    testShow "testImage"        testImage
+    testShow "testImageIds"                   testImageIds
+    testShow "testImageLocalCreateWaitDelete" testImageLocalCreateWaitDelete
+    testShow "testImageAliases"               testImageAliases
+    testShow "testImageAlias"                 testImageAlias
+    testShow "testImage"                      testImage
 
     testShow "testOperationIds"    testOperationIds
     testShow "testOperation"       testOperation
@@ -116,6 +118,28 @@ testImageIds = do
     ids <- runTrusted imageIds >>= assertResponseOK
     assertNotEq ids []
     return ids
+
+testImageLocalCreateWaitDelete :: MonadIO m => Test m ()
+testImageLocalCreateWaitDelete = do
+    op1 <- runTrusted (containerCreate contReq)
+    _   <- assertResponseCreated op1
+    _   <- runTrusted (operationWait $ responseOperation op1)
+    op2 <- runTrusted (imageCreate imgReq)
+    _   <- assertResponseCreated op2
+    _   <- runTrusted (operationWait $ responseOperation op2)
+    img <- runTrusted (imageAlias "create-image-test") >>= assertResponseOK
+    op3 <- runTrusted (imageDelete (ImageId . fromJust $ imageAliasTarget img) def)
+    _   <- assertResponseCreated op3
+    _   <- runTrusted (operationWait $ responseOperation op3)
+    op4 <- runTrusted (containerDelete "create-image-container" def)
+    _   <- assertResponseCreated op4
+    _   <- runTrusted (operationWait $ responseOperation op4)
+    return ()
+  where
+    contReq = containerCreateRequest "create-image-container" $ ContainerSourceLocalByAlias "test-image"
+    imgReq = (imageCreateRequest $ ImageSourceLocalContainer "create-image-container") {
+        imageCreateRequestAliases = [defaultImageAlias "create-image-test"]
+      }
 
 testImageAliases :: MonadIO m => Test m [ImageAliasName]
 testImageAliases = do

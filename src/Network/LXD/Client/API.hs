@@ -20,9 +20,11 @@ module Network.LXD.Client.API (
 
   -- ** Images
 , imageIds
+, imageCreate
 , imageAliases
 , imageAlias
 , image
+, imageDelete
 
   -- ** Operations
 , operationIds
@@ -66,9 +68,11 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> ExecAPI 'ExecWebsocketInteractive
       :<|> ExecAPI 'ExecWebsocketNonInteractive
       :<|> "1.0" :> "images" :> Get '[JSON] (Response [ImageId])
+      :<|> "1.0" :> "images" :> ReqBody '[JSON] ImageCreateRequest :> Post '[JSON] (ResponseOp (BackgroundOperation Value))
       :<|> "1.0" :> "images" :> "aliases" :> Get '[JSON] (Response [ImageAliasName])
       :<|> "1.0" :> "images" :> "aliases" :> Capture "name" ImageAliasName :> Get '[JSON] (Response ImageAlias)
       :<|> "1.0" :> "images" :> Capture "id" ImageId :> Get '[JSON] (Response Image)
+      :<|> "1.0" :> "images" :> Capture "id" ImageId :> ReqBody '[JSON] ImageDeleteRequest :> Delete '[JSON] (ResponseOp (BackgroundOperation Value))
       :<|> "1.0" :> "operations" :> Get '[JSON] (Response AllOperations)
       :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Get '[JSON] (Response Operation)
       :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Delete '[JSON] (Response Value)
@@ -89,9 +93,11 @@ containerExecImmediate               :: ExecClient 'ExecImmediate
 containerExecWebsocketInteractive    :: ExecClient 'ExecWebsocketInteractive
 containerExecWebsocketNonInteractive :: ExecClient 'ExecWebsocketNonInteractive
 imageIds                             :: ClientM (Response [ImageId])
+imageCreate                          :: ImageCreateRequest -> ClientM (ResponseOp (BackgroundOperation Value))
 imageAliases                         :: ClientM (Response [ImageAliasName])
 imageAlias                           :: ImageAliasName -> ClientM (Response ImageAlias)
 image                                :: ImageId -> ClientM (Response Image)
+imageDelete                          :: ImageId -> ImageDeleteRequest -> ClientM (ResponseOp (BackgroundOperation Value))
 operationIds                         :: ClientM (Response AllOperations)
 operation                            :: OperationId -> ClientM (Response Operation)
 operationCancel                      :: OperationId -> ClientM (Response Value)
@@ -108,9 +114,11 @@ supportedVersions                        :<|>
     containerExecWebsocketInteractive    :<|>
     containerExecWebsocketNonInteractive :<|>
     imageIds                             :<|>
+    imageCreate                          :<|>
     imageAliases                         :<|>
     imageAlias                           :<|>
     image                                :<|>
+    imageDelete                          :<|>
     operationIds                         :<|>
     operation                            :<|>
     operationCancel                      :<|>
