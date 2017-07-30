@@ -12,6 +12,7 @@ import Control.Monad ((>=>))
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Except (runExceptT)
 
+import Data.Aeson (object)
 import Data.Default (def)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
@@ -29,8 +30,9 @@ apiTester = do
     testShow "testSupportedVersions"   testSupportedVersions
     testShow "testTrustedCertificates" testTrustedCertificates
 
-    testShow "testContainerNames" testContainerNames
-    testShow "testContainer"      testContainer
+    testShow "testContainerNames"        testContainerNames
+    testShow "testContainer"             testContainer
+    testShow "testContainerCreateWaitDelete" testContainerCreateWaitDelete
 
     testShow "testContainerExecImmediate" testContainerExecImmediate
 
@@ -80,6 +82,28 @@ testContainerNames = do
 testContainer :: MonadIO m => Test m Container
 testContainer =
     runTrusted (container "test") >>= assertResponseOK
+
+testContainerCreateWaitDelete :: MonadIO m => Test m ()
+testContainerCreateWaitDelete = do
+    resp <- runTrusted (containerCreate req)
+    _    <- assertResponseCreated resp
+    _    <- runTrusted (operationWait $ responseOperation resp) >>= assertResponseOK
+    del  <- runTrusted (containerDelete "create-test" def)
+    _    <- assertResponseCreated del
+    _    <- runTrusted (operationWait $ responseOperation del) >>= assertResponseOK
+    return ()
+  where
+    req = ContainerCreateRequest {
+        containerCreateRequestName = "create-test"
+      , containerCreateRequestArchitecture = "x86_64"
+      , containerCreateRequestEphemeral = True
+      , containerCreateRequestProfiles = ["default"]
+      , containerCreateRequestConfig = object []
+      , containerCreateRequestDevices = object []
+      , containerCreateRequestInstanceType = Nothing
+      , containerCreateRequestSource = ContainerSourceLocalByAlias "test-image"
+      }
+
 
 testContainerExecImmediate :: MonadIO m => Test m (ExecResponse 'ExecImmediate)
 testContainerExecImmediate =

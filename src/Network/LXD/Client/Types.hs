@@ -30,6 +30,14 @@ module Network.LXD.Client.Types (
   -- ** Querying information
 , ContainerName(..)
 , Container(..)
+  -- ** Creating containers
+, ContainerCreateRequest(..)
+, ContainerSource(..)
+, ImageSourceLocalByAlias(..)
+, ImageSourceLocalByFingerprint(..)
+, ImageSourceRemote(..)
+  -- ** Deleting containers
+, ContainerDeleteRequest(..)
   -- ** Executing commands
 , ExecParams(..)
 , ExecRequest(..)
@@ -63,6 +71,7 @@ import Data.Aeson
 import Data.Default
 import Data.List (stripPrefix)
 import Data.Map.Strict (Map)
+import Data.Maybe (catMaybes)
 import Data.Text (pack, unpack)
 import qualified Data.Map.Strict as Map
 
@@ -204,6 +213,95 @@ instance FromJSON Container where
         <*> v .: "status"
         <*> v .: "status_code"
         <*> v .: "last_used_at"
+
+-- | LXD create container request object.
+--
+-- Used when querying @POST \/1.0\/containers@.
+data ContainerCreateRequest = ContainerCreateRequest {
+    containerCreateRequestName :: String
+  , containerCreateRequestArchitecture :: String
+  , containerCreateRequestProfiles :: [String]
+  , containerCreateRequestEphemeral :: Bool
+  , containerCreateRequestConfig :: Value
+  , containerCreateRequestDevices :: Value
+  , containerCreateRequestInstanceType :: Maybe String
+  , containerCreateRequestSource :: ContainerSource
+  } deriving (Show)
+
+instance ToJSON ContainerCreateRequest where
+    toJSON ContainerCreateRequest{..} = object $ [
+        "name" .= containerCreateRequestName
+      , "architecture" .= containerCreateRequestArchitecture
+      , "profiles" .= containerCreateRequestProfiles
+      , "ephemeral" .= containerCreateRequestEphemeral
+      , "config" .= containerCreateRequestConfig
+      , "devices" .= containerCreateRequestDevices
+      , "source" .= containerCreateRequestSource
+      ] ++ catMaybes [
+        (.=) <$> pure "instance_type" <*> containerCreateRequestInstanceType
+      ]
+
+-- | Source for creating a container, as used by 'ContainerCreateRequest'.
+data ContainerSource = ContainerSourceLocalByAlias ImageSourceLocalByAlias             -- ^ Container based on a local image with a certain alias.
+                     | ContainerSourceLocalByFingerprint ImageSourceLocalByFingerprint -- ^ Container based on a local image with a certain alias.
+                     | ContainerSourceNone                                             -- ^ Container without a pre-populated rootfs.
+                     | ContainerSourceRemote ImageSourceRemote                         -- ^ Continer based on a public remote image.
+                     deriving (Show)
+
+instance ToJSON ContainerSource where
+    toJSON (ContainerSourceLocalByAlias (ImageSourceLocalByAlias alias)) = object [
+        "type" .= ("image" :: String)
+      , "alias" .= alias
+      ]
+    toJSON (ContainerSourceLocalByFingerprint (ImageSourceLocalByFingerprint img)) = object [
+        "type" .= ("image" :: String)
+      , "fingerprint" .= img
+      ]
+    toJSON ContainerSourceNone = object [
+        "type" .= ("none" :: String)
+      ]
+    toJSON (ContainerSourceRemote ImageSourceRemote{..}) = object $ [
+        "type" .= ("image" :: String)
+      , "mode" .= ("pull" :: String)
+      , "server" .= imageSourceRemoteServer
+      , "alias" .= imageSourceRemoteAlias
+      ] ++ catMaybes [
+        (.=) <$> pure "secret" <*> imageSourceRemoteSecret
+      , (.=) <$> pure "certificate" <*> imageSourceRemoteCertificate
+      , (.=) <$> pure "alias" <*> imageSourceRemoteAlias
+      , (.=) <$> pure "fingerprint" <*> imageSourceRemoteFingerprint
+      ]
+      where
+        imageSourceRemoteAlias = either Just (const Nothing) imageSourceRemoteAliasOrFingerprint :: Maybe ImageAliasName
+        imageSourceRemoteFingerprint = either (const Nothing) Just imageSourceRemoteAliasOrFingerprint :: Maybe ImageId
+
+-- | Source for a local image, specified by its alias.
+newtype ImageSourceLocalByAlias = ImageSourceLocalByAlias ImageAliasName deriving (Show)
+
+instance IsString ImageSourceLocalByAlias where
+    fromString = ImageSourceLocalByAlias . ImageAliasName
+
+-- | Source for a local image, specified by its fingerprint
+newtype ImageSourceLocalByFingerprint = ImageSourceLocalByFingerprint ImageId deriving (Show)
+
+-- | Source for an image from a public or private remote.
+data ImageSourceRemote = ImageSourceRemote {
+    imageSourceRemoteServer :: String
+  , imageSourceRemoteSecret :: Maybe String
+  , imageSourceRemoteCertificate :: Maybe String
+  , imageSourceRemoteAliasOrFingerprint :: Either ImageAliasName ImageId
+  } deriving (Show)
+
+-- | LXD delete container request object.
+--
+-- Used when querying @DELETE \/1.0\/containers\/\<name\>@.
+data ContainerDeleteRequest = ContainerDeleteRequest
+
+instance Default ContainerDeleteRequest where
+    def = ContainerDeleteRequest
+
+instance ToJSON ContainerDeleteRequest where
+    toJSON _ = object []
 
 -- | Configuration parameter to 'ExecRequest' and 'ExecResponse'.
 data ExecParams = ExecImmediate               -- ^ Don't wait for a websocket connection before executing.
@@ -370,6 +468,9 @@ instance FromJSON ImageId where
             Nothing -> fail $ "could not parse image id: no prefix " ++ prefix
             Just img -> return $ ImageId img
 
+instance ToJSON ImageId where
+    toJSON (ImageId image) = toJSON image
+
 instance ToHttpApiData ImageId where
     toUrlPiece (ImageId img) = pack img
 
@@ -428,12 +529,18 @@ data Image = Image {
 -- Returned when querying @GET \/1.0\/images/aliases@.
 newtype ImageAliasName = ImageAliasName String deriving (Eq, Show)
 
+instance IsString ImageAliasName where
+    fromString = ImageAliasName
+
 instance FromJSON ImageAliasName where
     parseJSON = withText "ImageAliasName" $ \text ->
         let prefix = "/1.0/images/aliases/" in
         case stripPrefix prefix (unpack text) of
             Nothing -> fail $ "could not parse image alias name id: no prefix " ++ prefix
             Just name -> return $ ImageAliasName name
+
+instance ToJSON ImageAliasName where
+    toJSON (ImageAliasName image) = toJSON image
 
 instance ToHttpApiData ImageAliasName where
     toUrlPiece (ImageAliasName name) = pack name

@@ -10,7 +10,9 @@ module Network.LXD.Client.API (
   -- ** Containers
   -- *** Querying informaiton
 , containerNames
+, containerCreate
 , container
+, containerDelete
   -- *** Executing commands
 , containerExecImmediate
 , containerExecWebsocketInteractive
@@ -57,7 +59,9 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> "1.0" :> Get '[JSON] (Response ApiConfig)
       :<|> "1.0" :> "certificates" :> Get '[JSON] (Response [CertificateHash])
       :<|> "1.0" :> "containers" :> Get '[JSON] (Response [ContainerName])
+      :<|> "1.0" :> "containers" :> ReqBody '[JSON] ContainerCreateRequest :> Post '[JSON] (ResponseOp (BackgroundOperation Value))
       :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> Get '[JSON] (Response Container)
+      :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> ReqBody '[JSON] ContainerDeleteRequest :> Delete '[JSON] (ResponseOp (BackgroundOperation Value))
       :<|> ExecAPI 'ExecImmediate
       :<|> ExecAPI 'ExecWebsocketInteractive
       :<|> ExecAPI 'ExecWebsocketNonInteractive
@@ -78,7 +82,9 @@ supportedVersions                    :: ClientM (Response [ApiVersion])
 apiConfig                            :: ClientM (Response ApiConfig)
 trustedCertificates                  :: ClientM (Response [CertificateHash])
 containerNames                       :: ClientM (Response [ContainerName])
+containerCreate                      :: ContainerCreateRequest -> ClientM (ResponseOp (BackgroundOperation Value))
 container                            :: ContainerName -> ClientM (Response Container)
+containerDelete                      :: ContainerName -> ContainerDeleteRequest -> ClientM (ResponseOp (BackgroundOperation Value))
 containerExecImmediate               :: ExecClient 'ExecImmediate
 containerExecWebsocketInteractive    :: ExecClient 'ExecWebsocketInteractive
 containerExecWebsocketNonInteractive :: ExecClient 'ExecWebsocketNonInteractive
@@ -95,7 +101,9 @@ supportedVersions                        :<|>
     apiConfig                            :<|>
     trustedCertificates                  :<|>
     containerNames                       :<|>
+    containerCreate                      :<|>
     container                            :<|>
+    containerDelete                      :<|>
     containerExecImmediate               :<|>
     containerExecWebsocketInteractive    :<|>
     containerExecWebsocketNonInteractive :<|>
