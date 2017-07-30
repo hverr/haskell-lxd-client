@@ -4,6 +4,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -48,6 +49,12 @@ module Network.LXD.Client.Types (
 , FdSet(..)
 , Fds(..)
 , ExecFds
+  -- ** Working with files
+, RawFileResponse(..)
+, rawFileResponseBody
+, fileResponse
+, FileResponse(..)
+, PathResponse(..)
   -- ** Referencing containers
 , LocalContainer(..)
 
@@ -75,17 +82,26 @@ module Network.LXD.Client.Types (
 , OperationStatus
 , AllOperations(..)
 , Operation(..)
+
+  -- * Servant Helpers
+, JsonOrBinary
 ) where
 
 import Network.LXD.Prelude
 
 import Data.Aeson
+import Data.ByteString.Lazy (ByteString)
 import Data.Default
 import Data.List (stripPrefix)
+import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.Map.Strict (Map)
 import Data.Maybe (catMaybes)
 import Data.Text (pack, unpack)
 import qualified Data.Map.Strict as Map
+
+import Network.HTTP.Media.MediaType (MediaType, (//))
+
+import Servant.API.ContentTypes (Accept(..), MimeUnrender(..))
 
 import Web.Internal.HttpApiData (ToHttpApiData(..))
 
@@ -485,6 +501,45 @@ type family ExecResponseMetadata (params :: ExecParams) :: * where
     ExecResponseMetadata 'ExecWebsocketInteractive    = ExecResponseMetadataWebsocket 'FdPty
     ExecResponseMetadata 'ExecWebsocketNonInteractive = ExecResponseMetadataWebsocket 'FdAll
 
+-- | LXD file response object, representing either a file or a directory.
+--
+-- Used by the @GET \/1.0\/containers\/\<name\>\/files\/\<filename\>@ endpoints.
+data FileResponse = File ByteString
+                  | Directory (Response [String])
+                  deriving (Show)
+
+-- | Raw file response, not yet decoded, used because of a bug in Servant.
+--
+-- Use headers to get actual content type.
+data RawFileResponse = RawFileResponse MediaType ByteString deriving (Show)
+
+-- | Get the body of a 'RawFileResponse'.
+rawFileResponseBody :: RawFileResponse -> ByteString
+rawFileResponseBody (RawFileResponse _ bs) = bs
+
+-- | Construct a file response from a type and a 'ByteString'.
+fileResponse :: String -> ByteString -> Either String FileResponse
+fileResponse "file" bs = Right $ File bs
+fileResponse "directory" bs = eitherDecode bs
+fileResponse t _ = Left $ "unsupported file type: " ++ show t
+
+instance FromJSON FileResponse where
+    parseJSON v = Directory <$> parseJSON v
+
+instance MimeUnrender JsonOrBinary RawFileResponse where
+    mimeUnrenderWithType _ mt = Right . RawFileResponse mt
+
+-- | LXD path response object, which is a file and metadata.
+--
+-- Used by the @\/1.0\/containers\/\<name\>\/files\/...@ endpoints.
+data PathResponse = PathResponse {
+    pathUid :: Int
+  , pathGid :: Int
+  , pathMode :: String
+  , pathType :: String
+  , getFile :: FileResponse
+  } deriving (Show)
+
 -- | Reference to a local container, as used by 'ImageSource'.
 newtype LocalContainer = LocalContainer ContainerName deriving (Show)
 
@@ -758,3 +813,8 @@ instance FromJSON AuthStatus where
         "untrusted" -> pure Untrusted
         "trusted"   -> pure Trusted
         v           -> fail $ "Unknown value: " ++ show v
+
+data JsonOrBinary
+
+instance Accept JsonOrBinary where
+    contentTypes _ = ("application" // "octet-stream") :| ["application" // "json"]

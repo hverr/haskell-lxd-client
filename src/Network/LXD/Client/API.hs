@@ -1,4 +1,6 @@
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE TypeOperators #-}
 module Network.LXD.Client.API (
   -- * API
@@ -17,6 +19,8 @@ module Network.LXD.Client.API (
 , containerExecImmediate
 , containerExecWebsocketInteractive
 , containerExecWebsocketNonInteractive
+  -- *** Working with files
+, containerGetPath
 
   -- ** Images
 , imageIds
@@ -67,6 +71,7 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> ExecAPI 'ExecImmediate
       :<|> ExecAPI 'ExecWebsocketInteractive
       :<|> ExecAPI 'ExecWebsocketNonInteractive
+      :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> "files" :> QueryParam "path" FilePath :> Get '[JsonOrBinary] (Headers '[Header "X-LXD-Uid" Int, Header "X-LXD-Gid" Int, Header "X-LXD-Mode" String, Header "X-LXD-Type" String] RawFileResponse)
       :<|> "1.0" :> "images" :> Get '[JSON] (Response [ImageId])
       :<|> "1.0" :> "images" :> ReqBody '[JSON] ImageCreateRequest :> Post '[JSON] (ResponseOp (BackgroundOperation Value))
       :<|> "1.0" :> "images" :> "aliases" :> Get '[JSON] (Response [ImageAliasName])
@@ -92,6 +97,7 @@ containerDelete                      :: ContainerName -> ContainerDeleteRequest 
 containerExecImmediate               :: ExecClient 'ExecImmediate
 containerExecWebsocketInteractive    :: ExecClient 'ExecWebsocketInteractive
 containerExecWebsocketNonInteractive :: ExecClient 'ExecWebsocketNonInteractive
+containerGetPath'                    :: ContainerName -> Maybe FilePath -> ClientM (Headers '[Header "X-LXD-Uid" Int, Header "X-LXD-Gid" Int, Header "X-LXD-Mode" String, Header "X-LXD-Type" String] RawFileResponse)
 imageIds                             :: ClientM (Response [ImageId])
 imageCreate                          :: ImageCreateRequest -> ClientM (ResponseOp (BackgroundOperation Value))
 imageAliases                         :: ClientM (Response [ImageAliasName])
@@ -113,6 +119,7 @@ supportedVersions                        :<|>
     containerExecImmediate               :<|>
     containerExecWebsocketInteractive    :<|>
     containerExecWebsocketNonInteractive :<|>
+    containerGetPath'                    :<|>
     imageIds                             :<|>
     imageCreate                          :<|>
     imageAliases                         :<|>
@@ -124,6 +131,37 @@ supportedVersions                        :<|>
     operationCancel                      :<|>
     operationWait
     = client api
+
+containerGetPath :: ContainerName -> FilePath -> ClientM PathResponse
+containerGetPath name fp = do
+    headers <- containerGetPath' name (Just fp)
+    let raw = getResponse headers
+    case getHeadersHList headers of
+        hUid `HCons` (hGid `HCons` (hMode `HCons` (hType `HCons` HNil))) -> do
+            fileType <- getType hType raw
+            case fileResponse fileType (rawFileResponseBody raw) of
+                Left err -> error' raw $ "Could not decode " ++ fileType ++ ": " ++ err
+                Right file -> return PathResponse {
+                                  pathUid = getValueDef hUid 0
+                                , pathGid = getValueDef hGid 0
+                                , pathMode = getValueDef hMode "0700"
+                                , pathType = fileType
+                                , getFile = file
+                                }
+ where
+    getValueDef :: Header sym a -> a -> a
+    getValueDef (Header v) _   = v
+    getValueDef _          def = def
+
+    getType :: Header sym String -> RawFileResponse -> ClientM String
+    getType (Header v) _   = return v
+    getType _          raw = error' raw "No X-LXD-Type header present"
+
+    error' (RawFileResponse mt bs) m = throwError DecodeFailure {
+        decodeError = m
+      , responseContentType = mt
+      , responseBody = bs
+      }
 
 operationWebSocket :: OperationId -> Secret -> String
 operationWebSocket (OperationId oid) (Secret secret) =

@@ -30,6 +30,7 @@ library
                      , http-api-data
                      , http-client
                      , http-client-tls
+                     , http-media
                      , mtl
                      , servant
                      , servant-client

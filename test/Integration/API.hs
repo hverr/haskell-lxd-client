@@ -37,6 +37,9 @@ apiTester = do
 
     testShow "testContainerExecImmediate" testContainerExecImmediate
 
+    testShow "testGetDirectory"    testGetDirectory
+    testShow "testGetFileContents" testGetFileContents
+
     testShow "testImageIds"                   testImageIds
     testShow "testImageLocalCreateWaitDelete" testImageLocalCreateWaitDelete
     testShow "testImageAliases"               testImageAliases
@@ -106,6 +109,19 @@ testContainerCreateWaitDelete = do
       , containerCreateRequestSource = ContainerSourceLocalByAlias "test-image"
       }
 
+testGetDirectory :: MonadIO m => Test m [String]
+testGetDirectory = do
+    path <- runTrusted (containerGetPath "test" "/etc")
+    case getFile path of
+        File _ -> throwError "expected a directory, but got a file"
+        Directory resp -> assertResponseOK resp
+
+testGetFileContents :: MonadIO m => Test m FileResponse
+testGetFileContents = do
+    path <- runTrusted (containerGetPath "test" "/etc/resolv.conf")
+    case getFile path of
+        f@(File _) -> return f
+        Directory _ -> throwError "expected a file, but got a directory"
 
 testContainerExecImmediate :: MonadIO m => Test m (ExecResponse 'ExecImmediate)
 testContainerExecImmediate =
