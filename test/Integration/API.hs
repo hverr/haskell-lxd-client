@@ -37,8 +37,10 @@ apiTester = do
 
     testShow "testContainerExecImmediate" testContainerExecImmediate
 
-    testShow "testGetDirectory"    testGetDirectory
-    testShow "testGetFileContents" testGetFileContents
+    testShow "testGetDirectory"          testGetDirectory
+    testShow "testGetFileContents"       testGetFileContents
+    testShow "testUploadDeleteDirectory" testUploadDeleteDirectory
+    testShow "testUploadDeleteFile"      testUploadDeleteFile
 
     testShow "testImageIds"                   testImageIds
     testShow "testImageLocalCreateWaitDelete" testImageLocalCreateWaitDelete
@@ -122,6 +124,40 @@ testGetFileContents = do
     case getFile path of
         f@(File _) -> return f
         Directory _ -> throwError "expected a file, but got a directory"
+
+testUploadDeleteDirectory :: MonadIO m => Test m ()
+testUploadDeleteDirectory = do
+    _ <- runTrusted (containerPostPath "test" dir n n n "directory" n "")
+         >>= assertResponseOK
+
+    path <- runTrusted (containerGetPath "test" dir)
+    case getFile path of
+        File _ -> throwError "expected a directory, but got a file"
+        Directory _ -> return ()
+
+    _ <- runTrusted (containerDeletePath "test" dir)
+         >>= assertResponseOK
+    return ()
+  where
+    dir = "/tmp/upload-directory-test"
+    n = Nothing
+
+testUploadDeleteFile :: MonadIO m => Test m ()
+testUploadDeleteFile = do
+    _ <- runTrusted (containerPostPath "test" file n n n "file" n "Hello World!")
+         >>= assertResponseOK
+
+    path <- runTrusted (containerGetPath "test" file)
+    case getFile path of
+        File bs -> assertEq "Hello World!" bs
+        Directory _ -> throwError "expected a file, but got a directory"
+
+    _ <- runTrusted (containerDeletePath "test" file)
+         >>= assertResponseOK
+    return ()
+  where
+    file = "/tmp/upload-file-test"
+    n = Nothing
 
 testContainerExecImmediate :: MonadIO m => Test m (ExecResponse 'ExecImmediate)
 testContainerExecImmediate =

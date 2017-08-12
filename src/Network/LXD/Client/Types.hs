@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -50,6 +51,10 @@ module Network.LXD.Client.Types (
 , Fds(..)
 , ExecFds
   -- ** Working with files
+, Gid(..)
+, Uid(..)
+, FileMode(..)
+, FileType(..)
 , RawFileResponse(..)
 , rawFileResponseBody
 , fileResponse
@@ -103,7 +108,7 @@ import Network.HTTP.Media.MediaType (MediaType, (//))
 
 import Servant.API.ContentTypes (Accept(..), MimeUnrender(..))
 
-import Web.Internal.HttpApiData (ToHttpApiData(..))
+import Web.Internal.HttpApiData (FromHttpApiData, ToHttpApiData(..))
 
 -- | Generic LXD API response object.
 data GenericResponse op a = Response {
@@ -501,6 +506,18 @@ type family ExecResponseMetadata (params :: ExecParams) :: * where
     ExecResponseMetadata 'ExecWebsocketInteractive    = ExecResponseMetadataWebsocket 'FdPty
     ExecResponseMetadata 'ExecWebsocketNonInteractive = ExecResponseMetadataWebsocket 'FdAll
 
+-- | Group ID of a container file.
+newtype Gid = Gid Int deriving (Bounded, Enum, Eq, FromHttpApiData, Integral, Num, Ord, Read, Real, Show, ToHttpApiData)
+
+-- | User ID of a container file.
+newtype Uid = Uid Int deriving (Bounded, Enum, Eq, FromHttpApiData, Integral, Num, Ord, Read, Real, Show, ToHttpApiData)
+
+-- | Mode of a container file. Encoded in standard octal notation, e.g. @0644@.
+newtype FileMode = FileMode String deriving (Eq, FromHttpApiData, IsString, Ord, Read, Show, ToHttpApiData)
+
+-- | Type of a container file. Can be one of @directory@, @file@ or @symlink@.
+newtype FileType = FileType String deriving (Eq, FromHttpApiData, IsString, Ord, Read, Show, ToHttpApiData)
+
 -- | LXD file response object, representing either a file or a directory.
 --
 -- Used by the @GET \/1.0\/containers\/\<name\>\/files\/\<filename\>@ endpoints.
@@ -518,13 +535,19 @@ rawFileResponseBody :: RawFileResponse -> ByteString
 rawFileResponseBody (RawFileResponse _ bs) = bs
 
 -- | Construct a file response from a type and a 'ByteString'.
-fileResponse :: String -> ByteString -> Either String FileResponse
+fileResponse :: FileType -> ByteString -> Either String FileResponse
 fileResponse "file" bs = Right $ File bs
 fileResponse "directory" bs = eitherDecode bs
 fileResponse t _ = Left $ "unsupported file type: " ++ show t
 
 instance FromJSON FileResponse where
-    parseJSON v = Directory <$> parseJSON v
+    parseJSON v = Directory <$> do
+        r <- parseJSON v
+        -- If the directory is empty, the LXD server will send @null@ instead
+        -- of the empty list. Handle that case here.
+        case metadata r of
+            Nothing -> return r { metadata = [] }
+            Just xs -> return r { metadata = xs }
 
 instance MimeUnrender JsonOrBinary RawFileResponse where
     mimeUnrenderWithType _ mt = Right . RawFileResponse mt
@@ -533,10 +556,10 @@ instance MimeUnrender JsonOrBinary RawFileResponse where
 --
 -- Used by the @\/1.0\/containers\/\<name\>\/files\/...@ endpoints.
 data PathResponse = PathResponse {
-    pathUid :: Int
-  , pathGid :: Int
-  , pathMode :: String
-  , pathType :: String
+    pathUid :: Uid
+  , pathGid :: Gid
+  , pathMode :: FileMode
+  , pathType :: FileType
   , getFile :: FileResponse
   } deriving (Show)
 

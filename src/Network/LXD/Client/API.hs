@@ -20,7 +20,10 @@ module Network.LXD.Client.API (
 , containerExecWebsocketInteractive
 , containerExecWebsocketNonInteractive
   -- *** Working with files
+, WriteMode(..)
 , containerGetPath
+, containerPostPath
+, containerDeletePath
 
   -- ** Images
 , imageIds
@@ -71,7 +74,9 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> ExecAPI 'ExecImmediate
       :<|> ExecAPI 'ExecWebsocketInteractive
       :<|> ExecAPI 'ExecWebsocketNonInteractive
-      :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> "files" :> QueryParam "path" FilePath :> Get '[JsonOrBinary] (Headers '[Header "X-LXD-Uid" Int, Header "X-LXD-Gid" Int, Header "X-LXD-Mode" String, Header "X-LXD-Type" String] RawFileResponse)
+      :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> "files" :> QueryParam "path" FilePath :> Get '[JsonOrBinary] (Headers '[Header "X-LXD-Uid" Uid, Header "X-LXD-Gid" Gid, Header "X-LXD-Mode" FileMode, Header "X-LXD-Type" FileType] RawFileResponse)
+      :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> "files" :> QueryParam "path" FilePath :> Header "X-LXD-Uid" Uid :> Header "X-LXD-Gid" Gid :> Header "X-LXD-Mode" FileMode :> Header "X-LXD-Type" FileType :> Header "X-LXD-Write" String :> ReqBody '[OctetStream] ByteString :> Post '[JSON] (Response Value)
+      :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> "files" :> QueryParam "path" FilePath :> Delete '[JSON] (Response Value)
       :<|> "1.0" :> "images" :> Get '[JSON] (Response [ImageId])
       :<|> "1.0" :> "images" :> ReqBody '[JSON] ImageCreateRequest :> Post '[JSON] (ResponseOp (BackgroundOperation Value))
       :<|> "1.0" :> "images" :> "aliases" :> Get '[JSON] (Response [ImageAliasName])
@@ -97,7 +102,9 @@ containerDelete                      :: ContainerName -> ContainerDeleteRequest 
 containerExecImmediate               :: ExecClient 'ExecImmediate
 containerExecWebsocketInteractive    :: ExecClient 'ExecWebsocketInteractive
 containerExecWebsocketNonInteractive :: ExecClient 'ExecWebsocketNonInteractive
-containerGetPath'                    :: ContainerName -> Maybe FilePath -> ClientM (Headers '[Header "X-LXD-Uid" Int, Header "X-LXD-Gid" Int, Header "X-LXD-Mode" String, Header "X-LXD-Type" String] RawFileResponse)
+containerGetPath'                    :: ContainerName -> Maybe FilePath -> ClientM (Headers '[Header "X-LXD-Uid" Uid, Header "X-LXD-Gid" Gid, Header "X-LXD-Mode" FileMode, Header "X-LXD-Type" FileType] RawFileResponse)
+containerPostPath'                   :: ContainerName -> Maybe FilePath -> Maybe Uid -> Maybe Gid -> Maybe FileMode -> Maybe FileType -> Maybe String -> ByteString -> ClientM (Response Value)
+containerDeletePath'                 :: ContainerName -> Maybe FilePath -> ClientM (Response Value)
 imageIds                             :: ClientM (Response [ImageId])
 imageCreate                          :: ImageCreateRequest -> ClientM (ResponseOp (BackgroundOperation Value))
 imageAliases                         :: ClientM (Response [ImageAliasName])
@@ -120,6 +127,8 @@ supportedVersions                        :<|>
     containerExecWebsocketInteractive    :<|>
     containerExecWebsocketNonInteractive :<|>
     containerGetPath'                    :<|>
+    containerPostPath'                   :<|>
+    containerDeletePath'                 :<|>
     imageIds                             :<|>
     imageCreate                          :<|>
     imageAliases                         :<|>
@@ -140,7 +149,7 @@ containerGetPath name fp = do
         hUid `HCons` (hGid `HCons` (hMode `HCons` (hType `HCons` HNil))) -> do
             fileType <- getType hType raw
             case fileResponse fileType (rawFileResponseBody raw) of
-                Left err -> error' raw $ "Could not decode " ++ fileType ++ ": " ++ err
+                Left err -> error' raw $ "Could not decode " ++ show fileType ++ ": " ++ err
                 Right file -> return PathResponse {
                                   pathUid = getValueDef hUid 0
                                 , pathGid = getValueDef hGid 0
@@ -153,7 +162,7 @@ containerGetPath name fp = do
     getValueDef (Header v) _   = v
     getValueDef _          def = def
 
-    getType :: Header sym String -> RawFileResponse -> ClientM String
+    getType :: Header sym FileType -> RawFileResponse -> ClientM FileType
     getType (Header v) _   = return v
     getType _          raw = error' raw "No X-LXD-Type header present"
 
@@ -162,6 +171,26 @@ containerGetPath name fp = do
       , responseContentType = mt
       , responseBody = bs
       }
+
+data WriteMode = ModeOverwrite | ModeAppend deriving (Show)
+
+containerPostPath :: ContainerName
+                  -> FilePath
+                  -> Maybe Uid
+                  -> Maybe Gid
+                  -> Maybe FileMode
+                  -> FileType
+                  -> Maybe WriteMode
+                  -> ByteString
+                  -> ClientM (Response Value)
+containerPostPath name fp uid gid perm ftype mode =
+    containerPostPath' name (Just fp) uid gid perm (Just ftype) (mode' <$> mode)
+  where
+    mode' ModeOverwrite = "overwrite"
+    mode' ModeAppend    = "append"
+
+containerDeletePath :: ContainerName -> FilePath -> ClientM (Response Value)
+containerDeletePath name fp = containerDeletePath' name (Just fp)
 
 operationWebSocket :: OperationId -> Secret -> String
 operationWebSocket (OperationId oid) (Secret secret) =
