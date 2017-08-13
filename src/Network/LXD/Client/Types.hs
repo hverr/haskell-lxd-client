@@ -14,7 +14,7 @@ module Network.LXD.Client.Types (
   -- * Generic responses
   GenericResponse(..)
 , Response
-, ResponseOp
+, AsyncResponse
 , ResponseType(..)
   -- ** Background operations
 , BackgroundOperation(..)
@@ -41,7 +41,6 @@ module Network.LXD.Client.Types (
   -- ** Executing commands
 , ExecParams(..)
 , ExecRequest(..)
-, ExecResponse(..)
 , ExecResponseMetadataImmediate
 , ExecResponseMetadataWebsocket(..)
 , ExecResponseMetadata
@@ -121,11 +120,11 @@ data GenericResponse op a = Response {
   , metadata :: a
 } deriving (Show)
 
--- | LXD API repsonse object, without resulting operation.
+-- | LXD API synchronous repsonse object, without resulting operation.
 type Response a = GenericResponse String a
 
--- | LXD API response object, with resulting operation
-type ResponseOp a = GenericResponse OperationId a
+-- | LXD API asynchronous response object, with resulting operation
+type AsyncResponse a = GenericResponse OperationId (BackgroundOperation a)
 
 instance (FromJSON op, FromJSON a) => FromJSON (GenericResponse op a) where
     parseJSON = withObject "Response" $ \v -> Response
@@ -443,36 +442,6 @@ instance FromJSON (Fds 'FdPty) where
 type family ExecFds (params :: ExecParams) :: FdSet where
     ExecFds 'ExecWebsocketInteractive    = 'FdPty
     ExecFds 'ExecWebsocketNonInteractive = 'FdAll
-
--- | Response of an exec request, configured using 'ExecParams' as type
--- parameter.
---
--- Returned when querying @POST \/1.0\/containers\/\<name\>\/exec@.
-data ExecResponse (params :: ExecParams) = ExecResponse {
-    execResponseId :: String
-  , execResponseClass :: String
-  , execResponseCreatedAt :: String
-  , execResponseUpdatedAt :: String
-  , execResponseStatus :: String
-  , execResponseStatusCode :: Int
-  , execResponseMetadata :: ExecResponseMetadata params
-  , execResponseMayCancel :: Bool
-  , execResponseErr :: String
-}
-
-deriving instance Show (ExecResponseMetadata params) => Show (ExecResponse params)
-
-instance FromJSON (ExecResponseMetadata params) => FromJSON (ExecResponse (params :: ExecParams)) where
-    parseJSON = withObject "ExecResponse" $ \v -> ExecResponse
-        <$> v .: "id"
-        <*> v .: "class"
-        <*> v .: "created_at"
-        <*> v .: "updated_at"
-        <*> v .: "status"
-        <*> v .: "status_code"
-        <*> v .: "metadata"
-        <*> v .: "may_cancel"
-        <*> v .: "err"
 
 -- | Metadata of an immediate exec response.
 --

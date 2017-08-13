@@ -68,9 +68,9 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> "1.0" :> Get '[JSON] (Response ApiConfig)
       :<|> "1.0" :> "certificates" :> Get '[JSON] (Response [CertificateHash])
       :<|> "1.0" :> "containers" :> Get '[JSON] (Response [ContainerName])
-      :<|> "1.0" :> "containers" :> ReqBody '[JSON] ContainerCreateRequest :> Post '[JSON] (ResponseOp (BackgroundOperation Value))
+      :<|> "1.0" :> "containers" :> ReqBody '[JSON] ContainerCreateRequest :> Post '[JSON] (AsyncResponse Value)
       :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> Get '[JSON] (Response Container)
-      :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> ReqBody '[JSON] ContainerDeleteRequest :> Delete '[JSON] (ResponseOp (BackgroundOperation Value))
+      :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> ReqBody '[JSON] ContainerDeleteRequest :> Delete '[JSON] (AsyncResponse Value)
       :<|> ExecAPI 'ExecImmediate
       :<|> ExecAPI 'ExecWebsocketInteractive
       :<|> ExecAPI 'ExecWebsocketNonInteractive
@@ -78,11 +78,11 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> "files" :> QueryParam "path" FilePath :> Header "X-LXD-Uid" Uid :> Header "X-LXD-Gid" Gid :> Header "X-LXD-Mode" FileMode :> Header "X-LXD-Type" FileType :> Header "X-LXD-Write" String :> ReqBody '[OctetStream] ByteString :> Post '[JSON] (Response Value)
       :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> "files" :> QueryParam "path" FilePath :> Delete '[JSON] (Response Value)
       :<|> "1.0" :> "images" :> Get '[JSON] (Response [ImageId])
-      :<|> "1.0" :> "images" :> ReqBody '[JSON] ImageCreateRequest :> Post '[JSON] (ResponseOp (BackgroundOperation Value))
+      :<|> "1.0" :> "images" :> ReqBody '[JSON] ImageCreateRequest :> Post '[JSON] (AsyncResponse Value)
       :<|> "1.0" :> "images" :> "aliases" :> Get '[JSON] (Response [ImageAliasName])
       :<|> "1.0" :> "images" :> "aliases" :> Capture "name" ImageAliasName :> Get '[JSON] (Response ImageAlias)
       :<|> "1.0" :> "images" :> Capture "id" ImageId :> Get '[JSON] (Response Image)
-      :<|> "1.0" :> "images" :> Capture "id" ImageId :> ReqBody '[JSON] ImageDeleteRequest :> Delete '[JSON] (ResponseOp (BackgroundOperation Value))
+      :<|> "1.0" :> "images" :> Capture "id" ImageId :> ReqBody '[JSON] ImageDeleteRequest :> Delete '[JSON] (AsyncResponse Value)
       :<|> "1.0" :> "operations" :> Get '[JSON] (Response AllOperations)
       :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Get '[JSON] (Response Operation)
       :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Delete '[JSON] (Response Value)
@@ -96,9 +96,9 @@ supportedVersions                    :: ClientM (Response [ApiVersion])
 apiConfig                            :: ClientM (Response ApiConfig)
 trustedCertificates                  :: ClientM (Response [CertificateHash])
 containerNames                       :: ClientM (Response [ContainerName])
-containerCreate                      :: ContainerCreateRequest -> ClientM (ResponseOp (BackgroundOperation Value))
+containerCreate                      :: ContainerCreateRequest -> ClientM (AsyncResponse Value)
 container                            :: ContainerName -> ClientM (Response Container)
-containerDelete                      :: ContainerName -> ContainerDeleteRequest -> ClientM (ResponseOp (BackgroundOperation Value))
+containerDelete                      :: ContainerName -> ContainerDeleteRequest -> ClientM (AsyncResponse Value)
 containerExecImmediate               :: ExecClient 'ExecImmediate
 containerExecWebsocketInteractive    :: ExecClient 'ExecWebsocketInteractive
 containerExecWebsocketNonInteractive :: ExecClient 'ExecWebsocketNonInteractive
@@ -106,11 +106,11 @@ containerGetPath'                    :: ContainerName -> Maybe FilePath -> Clien
 containerPostPath'                   :: ContainerName -> Maybe FilePath -> Maybe Uid -> Maybe Gid -> Maybe FileMode -> Maybe FileType -> Maybe String -> ByteString -> ClientM (Response Value)
 containerDeletePath'                 :: ContainerName -> Maybe FilePath -> ClientM (Response Value)
 imageIds                             :: ClientM (Response [ImageId])
-imageCreate                          :: ImageCreateRequest -> ClientM (ResponseOp (BackgroundOperation Value))
+imageCreate                          :: ImageCreateRequest -> ClientM (AsyncResponse Value)
 imageAliases                         :: ClientM (Response [ImageAliasName])
 imageAlias                           :: ImageAliasName -> ClientM (Response ImageAlias)
 image                                :: ImageId -> ClientM (Response Image)
-imageDelete                          :: ImageId -> ImageDeleteRequest -> ClientM (ResponseOp (BackgroundOperation Value))
+imageDelete                          :: ImageId -> ImageDeleteRequest -> ClientM (AsyncResponse Value)
 operationIds                         :: ClientM (Response AllOperations)
 operation                            :: OperationId -> ClientM (Response Operation)
 operationCancel                      :: OperationId -> ClientM (Response Value)
@@ -215,6 +215,6 @@ writeAllWebSocket input con = do
         Just bs -> WS.sendBinaryData con bs
                 >> writeAllWebSocket input con
 
-type ExecAPI a = "1.0" :> "containers" :> Capture "name" ContainerName :> "exec" :> ReqBody '[JSON] (ExecRequest a) :> Post '[JSON] (ResponseOp (ExecResponse a))
+type ExecAPI a = "1.0" :> "containers" :> Capture "name" ContainerName :> "exec" :> ReqBody '[JSON] (ExecRequest a) :> Post '[JSON] (AsyncResponse (ExecResponseMetadata a))
 
-type ExecClient a = ContainerName -> ExecRequest a -> ClientM (ResponseOp (ExecResponse a))
+type ExecClient a = ContainerName -> ExecRequest a -> ClientM (AsyncResponse (ExecResponseMetadata a))

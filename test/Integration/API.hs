@@ -159,9 +159,10 @@ testUploadDeleteFile = do
     file = "/tmp/upload-file-test"
     n = Nothing
 
-testContainerExecImmediate :: MonadIO m => Test m (ExecResponse 'ExecImmediate)
-testContainerExecImmediate =
-    runTrusted (containerExecImmediate "test" req) >>= assertResponseCreated
+testContainerExecImmediate :: MonadIO m => Test m (ExecResponseMetadata 'ExecImmediate)
+testContainerExecImmediate = do
+    v <- runTrusted (containerExecImmediate "test" req) >>= assertResponseCreated
+    return (backgroundOperationMetadata v)
   where
     req = def { execRequestCommand = ["/bin/echo", "Hello, World!"] }
 
@@ -236,7 +237,7 @@ testExecHelloWorld = do
     resp <- runTrusted (containerExecWebsocketNonInteractive "test" req)
     md   <- assertResponseCreated resp
     let oid = responseOperation resp
-    let fds = execResponseMetadataWebsocketFds (execResponseMetadata md)
+    let fds = execResponseMetadataWebsocketFds (backgroundOperationMetadata md)
     let stdout = operationWebSocket oid (fdsAllStdout fds)
     let stderr = operationWebSocket oid (fdsAllStderr fds)
     let stdin  = operationWebSocket oid (fdsAllStdin fds)
