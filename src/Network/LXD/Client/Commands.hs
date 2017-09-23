@@ -12,16 +12,21 @@ module Network.LXD.Client.Commands (
 , lxcExecEnv
 , lxcExecRaw
 
-  -- * Files
+  -- * Files and directories
+  -- ** Files
 , lxcFilePull
 , lxcFilePullRaw
 , lxcFilePush
+, lxcFilePushAttrs
 , lxcFilePushRaw
 , lxcFilePushRawAttrs
+  -- ** Directories
 , lxcFileMkdir
 , lxcFileMkdirTemplate
 , lxcFileMkdirAttrs
-, lxcFilePullRecursive
+  -- ** Recursive
+, lxcFilePushRecursive
+, lxcFilePushRecursiveAttrs
 ) where
 
 import Network.LXD.Prelude
@@ -40,7 +45,8 @@ import qualified Data.ByteString.Lazy as BL
 import Numeric (showOct)
 
 import Servant.Client (ClientM, ClientEnv, runClientM)
-import System.FilePath (splitPath)
+import System.Directory (doesDirectoryExist, listDirectory)
+import System.FilePath ((</>), splitPath)
 import System.Posix.Files (getFileStatus, fileMode)
 import qualified System.IO as IO
 
@@ -182,11 +188,21 @@ lxcFilePush :: HasClient m
             -> FilePath       -- ^ Source path, in the host
             -> FilePath       -- ^ Destination path, in the container
             -> m ()
-lxcFilePush name src dst = do
+lxcFilePush name src dst = lxcFilePushAttrs name src dst Nothing Nothing
+
+-- | Push the fole contents to an LXD container, with the given attributes.
+lxcFilePushAttrs :: HasClient m
+                 => ContainerName  -- ^ Container name
+                 -> FilePath       -- ^ Source path, in the host
+                 -> FilePath       -- ^ Destination path, in the container
+                 -> Maybe Uid
+                 -> Maybe Gid
+                 -> m ()
+lxcFilePushAttrs name src dst uid gid = do
     mode <- liftIO $ fileMode <$> getFileStatus src
     bs   <- liftIO $ BL.readFile src
     lxcFilePushRawAttrs name dst
-                        Nothing Nothing
+                        uid gid
                         (Just $ convFileMode mode)
                         "file"
                         Nothing
@@ -258,13 +274,13 @@ lxcFileMkdirAttrs name dir True uid gid fm =
     ignoreExc :: Monad m => SomeException -> m (Maybe a)
     ignoreExc _ = return Nothing
 
--- | Recursively pull a directory (or file) from a container.
-lxcFilePullRecursive :: HasClient m
+-- | Recursively push a directory (or file) to a container.
+lxcFilePushRecursive :: HasClient m
                      => ContainerName  -- ^ Container name
-                     -> FilePath       -- ^ Source path, in the container
-                     -> FilePath       -- ^ Destination path, in the host
+                     -> FilePath       -- ^ Source path, in the host
+                     -> FilePath       -- ^ Destination path, in the container
                      -> m ()
-lxcFilePullRecursive = undefined
+lxcFilePushRecursive name src dst = lxcFilePushRecursiveAttrs name src dst Nothing Nothing
 
 -- | Recursively push a directory (or file) to a container, with given file
 -- attributes.
@@ -275,7 +291,18 @@ lxcFilePushRecursiveAttrs :: HasClient m
                           -> Maybe Uid
                           -> Maybe Gid
                           -> m ()
-lxcFilePushRecursiveAttrs name src dst uid gid = undefined
+lxcFilePushRecursiveAttrs name src dst uid gid = do
+    isDir <- liftIO $ doesDirectoryExist src
+    if not isDir
+        then lxcFilePushAttrs name src dst uid gid
+        else do
+            lxcFileMkdirTemplate name src dst
+            files <- liftIO $ listDirectory src
+            mapM_ go files
+  where
+    go file = lxcFilePushRecursiveAttrs name src' dst' uid gid
+      where src' = src </> file
+            dst' = dst </> file
 
 -- | Run a client operation.
 runClient :: HasClient m => ClientM a -> m a
