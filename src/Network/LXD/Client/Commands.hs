@@ -25,6 +25,7 @@ module Network.LXD.Client.Commands (
 , lxcFileMkdirTemplate
 , lxcFileMkdirAttrs
   -- ** Recursive
+, lxcFilePullRecursive
 , lxcFilePushRecursive
 , lxcFilePushRecursiveAttrs
 ) where
@@ -42,12 +43,12 @@ import Data.List (inits)
 import Data.Map.Strict (Map)
 import qualified Data.ByteString.Lazy as BL
 
-import Numeric (showOct)
+import Numeric (readOct, showOct)
 
 import Servant.Client (ClientM, ClientEnv, runClientM)
 import System.Directory (doesDirectoryExist, listDirectory)
 import System.FilePath ((</>), splitPath)
-import System.Posix.Files (getFileStatus, fileMode)
+import System.Posix.Files (getFileStatus, fileMode, setFileMode)
 import qualified System.IO as IO
 
 import Network.LXD.Client
@@ -172,7 +173,16 @@ lxcFilePull :: HasClient m
             -> FilePath       -- ^ Source path, in the container
             -> FilePath       -- ^ Destination path, in the host
             -> m ()
-lxcFilePull name src dst = lxcFilePullRaw name src >>= liftIO . BL.writeFile dst
+lxcFilePull name src dst = do
+    path <- runClient $ containerGetPath name src
+    case getFile path of
+        Directory _ -> throwM $ ClientError "expected a file, but got a directory"
+        File bs -> do
+            m' <- convFileMode' $ pathMode path
+            liftIO $ BL.writeFile dst bs
+            liftIO $ setFileMode dst m'
+
+    lxcFilePullRaw name src >>= liftIO . BL.writeFile dst
 
 -- | Pull the file contents from an LXD container, return the lazy bytestring.
 lxcFilePullRaw :: HasClient m => ContainerName -> FilePath -> m ByteString
@@ -274,6 +284,14 @@ lxcFileMkdirAttrs name dir True uid gid fm =
     ignoreExc :: Monad m => SomeException -> m (Maybe a)
     ignoreExc _ = return Nothing
 
+-- | Recursively pull a directory (or file) from a container.
+lxcFilePullRecursive :: HasClient m
+                     => ContainerName  -- ^ Container name
+                     -> FilePath       -- ^ Source path, in the container
+                     -> FilePath       -- ^ Destination path, in the host
+                     -> m ()
+lxcFilePullRecursive = undefined
+
 -- | Recursively push a directory (or file) to a container.
 lxcFilePushRecursive :: HasClient m
                      => ContainerName  -- ^ Container name
@@ -316,6 +334,11 @@ convFileMode :: (Integral a, Show a) => a -> FileMode
 convFileMode m = FileMode . pad $ showOct m ""
   where pad s | n <- length s, n < 4 = replicate (4 - n) '0' ++ s
               | otherwise            = s
+
+convFileMode' :: (MonadThrow m, Eq a, Num a) => FileMode -> m a
+convFileMode' (FileMode fm) = case readOct fm of
+    [(m, "")] -> return m
+    _ -> throwM $ ClientError $ "received invalid file mode: " ++ show fm
 
 -- | Exception raised when the remote host client couldn't be reached.
 newtype ClientError = ClientError String
