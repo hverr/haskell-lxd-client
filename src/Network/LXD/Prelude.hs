@@ -3,7 +3,7 @@ module Network.LXD.Prelude (
   module Prelude
 
   -- * Monads
-, join
+, module Control.Monad
 
   -- * Monad Transformers
 , MonadError, ExceptT, runExceptT, throwError
@@ -14,6 +14,9 @@ module Network.LXD.Prelude (
   -- * Foldable
 , foldlM
 
+  -- * Monoid
+, module Data.Monoid
+
   -- * Strings
 , IsString(fromString)
 ) where
@@ -21,7 +24,7 @@ module Network.LXD.Prelude (
 import Prelude hiding (error)
 
 -- Monads
-import Control.Monad (join)
+import Control.Monad (join, unless, void)
 
 -- Monad transformers
 import Control.Monad.Except (MonadError, ExceptT, runExceptT, throwError)
@@ -31,6 +34,9 @@ import Control.Monad.Trans.Class (MonadTrans, lift)
 
 -- Foldable
 import Data.Foldable (foldlM)
+
+-- Monoid
+import Data.Monoid (Monoid, mempty, mappend, (<>))
 
 -- Strings
 import Data.String (IsString(fromString))

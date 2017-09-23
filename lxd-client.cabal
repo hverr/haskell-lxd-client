@@ -17,16 +17,20 @@ library
   hs-source-dirs:      src
   exposed-modules:     Network.LXD.Client
                      , Network.LXD.Client.API
+                     , Network.LXD.Client.Commands
                      , Network.LXD.Client.Types
                      , Network.LXD.Prelude
   build-depends:       base >= 4.7 && < 5
                      , aeson
+                     , async
                      , bytestring
                      , connection
                      , containers
                      , data-default
                      , directory
                      , either
+                     , exceptions
+                     , filepath
                      , http-api-data
                      , http-client
                      , http-client-tls
@@ -37,6 +41,7 @@ library
                      , text
                      , tls
                      , transformers
+                     , unix
                      , websockets
                      , x509
                      , x509-store
