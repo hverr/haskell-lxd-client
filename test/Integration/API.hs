@@ -245,9 +245,9 @@ testExecHelloWorld = do
     input <- liftIO newEmptyMVar
     output <- liftIO $ newMVar BL.empty
 
-    stdoutThread <- async' $ runWebSockets trustedHost stdout (readAllWebSocket (save' output))
-    stderrThread <- async' $ runWebSockets trustedHost stderr (readAllWebSocket BL.putStr)
-    stdinThread  <- async' $ runWebSockets trustedHost stdin  (writeAllWebSocket input)
+    stdoutThread <- async' $ runWebSocketsRemote trustedHost stdout (readAllWebSocket (save' output))
+    stderrThread <- async' $ runWebSocketsRemote trustedHost stderr (readAllWebSocket BL.putStr)
+    stdinThread  <- async' $ runWebSocketsRemote trustedHost stdin  (writeAllWebSocket input)
 
     wait' stdoutThread >>= assertEither
     wait' stderrThread >>= assertEither

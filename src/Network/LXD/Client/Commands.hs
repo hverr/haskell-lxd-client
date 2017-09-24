@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 module Network.LXD.Client.Commands (
@@ -52,6 +53,7 @@ import Data.Map.Strict (Map)
 import qualified Data.ByteString.Lazy as BL
 
 import Numeric (readOct, showOct)
+import qualified Network.WebSockets as WS
 
 import Servant.Client (ClientM, ClientEnv, runClientM)
 import System.Directory (createDirectory, doesDirectoryExist, listDirectory)
@@ -61,18 +63,35 @@ import qualified System.IO as IO
 
 import Network.LXD.Client
 
--- | Monad with access to a 'RemoteHost'.
+-- | A host that can be connected to.
+data Host = HLocalHost LocalHost
+          | HRemoteHost RemoteHost
+
+-- | Monad with access to a 'ClientEnv'.
 class (MonadIO m, MonadThrow m) => HasClient m where
     -- | Return the LXD remote host to connect to.
-    askRemoteHost :: m RemoteHost
+    askHost :: m Host
 
     -- | Return the 'ClientEnv' to use when connecting to the LXD host.
     askClientEnv :: m ClientEnv
     askClientEnv = do
-        remoteHost <- askRemoteHost
-        liftIO (runExceptT $ remoteHostClient remoteHost) >>= \case
+        host <- askHost
+        liftIO (runExceptT $ client host) >>= \case
             Left err -> throwM $ ClientError err
             Right env -> return env
+     where
+       client (HLocalHost host) = localHostClient host
+       client (HRemoteHost host) = remoteHostClient host
+
+-- | Run a web sockets application using.
+runWebSockets :: Host -> String -> WS.ClientApp a -> IO a
+runWebSockets host' path app =
+    runExceptT runWS >>= \case
+        Left err -> throwM $ ClientError err
+        Right env -> return env
+  where
+    runWS | HLocalHost host <- host' = runWebSocketsLocal host path app
+          | HRemoteHost host <- host' = runWebSocketsRemote host path app
 
 -- | List all container names.
 lxcList :: HasClient m => m [ContainerName]
@@ -159,10 +178,8 @@ lxcExecRaw name cmd args env stdin stdout stderr = do
         stderr' = operationWebSocket oid (fdsAllStderr fds)
         stdin'  = operationWebSocket oid (fdsAllStdin  fds)
 
-    remoteHost <- askRemoteHost
-    let runWS path app = do e <- runExceptT (runWebSockets remoteHost path app)
-                            case e of Left err -> throwM $ ClientError err
-                                      Right v -> return v
+    host <- askHost
+    let runWS = runWebSockets host
 
     liftIO . async $
         withAsync (runWS stdout' $ readAllWebSocket (putMVar stdout)) $ \stdoutThread ->

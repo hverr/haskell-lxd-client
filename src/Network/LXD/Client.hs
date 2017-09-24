@@ -18,7 +18,8 @@ module Network.LXD.Client (
 , localHostClient
 
   -- * WebSockets Clients
-, runWebSockets
+, runWebSocketsRemote
+, runWebSocketsLocal
 ) where
 
 import Network.LXD.Prelude
@@ -172,18 +173,17 @@ clientConnectionParams RemoteHost{..} = do
                             , connectionUseSocks = Nothing }
 
 localHostClient :: MonadIO m => LocalHost -> m ClientEnv
-localHostClient LocalHost{..} = do
+localHostClient host = do
     m <- liftIO $ newManager defaultManagerSettings { managerRawConnection = createUnixConnection }
     return $ ClientEnv m baseUrl
   where
     createUnixConnection = return $ \_ _ _ -> do
-        s <- Socket.socket Socket.AF_UNIX Socket.Stream Socket.defaultProtocol
-        Socket.connect s (Socket.SockAddrUnix localHostUnix)
+        s <- unixSocket host
         socketConnection s 4096
     baseUrl = BaseUrl Http "localhost" 80 ""
 
-runWebSockets :: (MonadError String m, MonadIO m) => RemoteHost -> String -> WS.ClientApp a -> m a
-runWebSockets host path app = do
+runWebSocketsRemote :: (MonadError String m, MonadIO m) => RemoteHost -> String -> WS.ClientApp a -> m a
+runWebSocketsRemote host path app = do
     ctx    <- liftIO initConnectionContext
     params <- clientConnectionParams host
     liftIO $ bracket (Con.connectTo ctx params)
@@ -207,6 +207,11 @@ runWebSockets host path app = do
         Nothing -> return ()
         Just bs' -> Con.connectionPut con (B.toStrict bs')
 
+runWebSocketsLocal :: (MonadError String m, MonadIO m) => LocalHost -> String -> WS.ClientApp a -> m a
+runWebSocketsLocal host path app = liftIO $ do
+    s <- unixSocket host
+    WS.runClientWithSocket s "localhost" path WS.defaultConnectionOptions [] app
+
 validateServerCert :: CertificateStore
                    -> ValidationCache
                    -> ServiceID
@@ -215,6 +220,12 @@ validateServerCert :: CertificateStore
 validateServerCert a b c d = filter (not . ignore) <$> validateDefault a b c d
   where ignore x | NameMismatch _ <- x = True
                  | otherwise = False
+
+unixSocket :: LocalHost -> IO Socket.Socket
+unixSocket LocalHost{..} = do
+    s <- Socket.socket Socket.AF_UNIX Socket.Stream Socket.defaultProtocol
+    Socket.connect s (Socket.SockAddrUnix localHostUnix)
+    return s
 
 catchAdditional :: IO (Either String a) -> IO (Either String a)
 catchAdditional action = join . mapLeft show <$> tryJust (Just . toException') action
