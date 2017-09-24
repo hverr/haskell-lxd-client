@@ -46,7 +46,7 @@ import qualified Data.ByteString.Lazy as BL
 import Numeric (readOct, showOct)
 
 import Servant.Client (ClientM, ClientEnv, runClientM)
-import System.Directory (doesDirectoryExist, listDirectory)
+import System.Directory (createDirectory, doesDirectoryExist, listDirectory)
 import System.FilePath ((</>), splitPath)
 import System.Posix.Files (getFileStatus, fileMode, setFileMode)
 import qualified System.IO as IO
@@ -290,7 +290,22 @@ lxcFilePullRecursive :: HasClient m
                      -> FilePath       -- ^ Source path, in the container
                      -> FilePath       -- ^ Destination path, in the host
                      -> m ()
-lxcFilePullRecursive = undefined
+lxcFilePullRecursive name src dst = do
+    path <- runClient $ containerGetPath name src
+    m'   <- convFileMode' $ pathMode path
+    case getFile path of
+        File bs -> do
+            liftIO $ BL.writeFile dst bs
+            liftIO $ setFileMode dst m'
+        Directory resp -> do
+            contents <- checkResponseOK resp
+            liftIO $ createDirectory dst
+            mapM_ go contents
+            liftIO $ setFileMode dst m'
+  where
+    go file = lxcFilePullRecursive name src' dst'
+      where src' = src </> file
+            dst' = dst </> file
 
 -- | Recursively push a directory (or file) to a container.
 lxcFilePushRecursive :: HasClient m
