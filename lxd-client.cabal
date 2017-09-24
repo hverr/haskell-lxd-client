@@ -72,6 +72,23 @@ test-suite lxd-client-test
   default-extensions:  NoImplicitPrelude OverloadedStrings
   default-language:    Haskell2010
 
+test-suite lxd-client-integration
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Integration.hs
+  other-modules:
+  build-depends:       base
+                     , lxd-client
+                     , hspec
+                     , hspec-core
+                     , random
+                     , text
+                     , turtle
+                     , uuid
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall
+  default-extensions:  NoImplicitPrelude OverloadedStrings
+  default-language:    Haskell2010
+
 source-repository head
   type:     git
   location: https://github.com/hverr/haskell-lxd-client
