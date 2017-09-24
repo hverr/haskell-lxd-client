@@ -1,9 +1,16 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 module Network.LXD.Client.Commands (
+  -- * Running commands
+  HasClient(..)
+, defaultClientEnv
+, WithLocalHost, runWithLocalHost
+, WithRemoteHost, runWithRemoteHost
+
   -- * Containers
-  lxcList
+, lxcList
 , lxcCreate
 , lxcDelete
 , lxcInfo
@@ -44,7 +51,8 @@ import Network.LXD.Prelude
 import Control.Concurrent.Async (Async, async, withAsync, wait)
 import Control.Concurrent.MVar
 import Control.Monad ((>=>))
-import Control.Monad.Catch (Exception, SomeException, MonadThrow, throwM, catch)
+import Control.Monad.Catch (Exception, SomeException, MonadThrow, throwM, MonadCatch, catch, MonadMask)
+import Control.Monad.State (StateT, evalStateT, gets, modify')
 
 import Data.ByteString.Lazy (ByteString)
 import Data.Default (def)
@@ -73,15 +81,21 @@ class (MonadIO m, MonadThrow m) => HasClient m where
     askHost :: m Host
 
     -- | Return the 'ClientEnv' to use when connecting to the LXD host.
+    --
+    -- Returns 'defaultClientEnv' by default.
     askClientEnv :: m ClientEnv
-    askClientEnv = do
-        host <- askHost
-        liftIO (runExceptT $ client host) >>= \case
-            Left err -> throwM $ ClientError err
-            Right env -> return env
-     where
-       client (HLocalHost host) = localHostClient host
-       client (HRemoteHost host) = remoteHostClient host
+    askClientEnv = defaultClientEnv
+
+-- | Create a default 'ClientEnv'.
+defaultClientEnv :: HasClient m => m ClientEnv
+defaultClientEnv = do
+    host <- askHost
+    liftIO (runExceptT $ client host) >>= \case
+        Left err -> throwM $ ClientError err
+        Right env -> return env
+ where
+   client (HLocalHost host) = localHostClient host
+   client (HRemoteHost host) = remoteHostClient host
 
 -- | Run a web sockets application using.
 runWebSockets :: Host -> String -> WS.ClientApp a -> IO a
@@ -92,6 +106,44 @@ runWebSockets host' path app =
   where
     runWS | HLocalHost host <- host' = runWebSocketsLocal host path app
           | HRemoteHost host <- host' = runWebSocketsRemote host path app
+
+-- | Monad with access to a local host.
+newtype WithLocalHost a = WithLocalHost (StateT (LocalHost, Maybe ClientEnv) IO a)
+                        deriving (Applicative, Functor, Monad, MonadIO, MonadCatch, MonadThrow, MonadMask)
+
+instance HasClient WithLocalHost where
+    askHost = WithLocalHost . gets $ HLocalHost . fst
+    askClientEnv = do
+        env <- WithLocalHost . gets $ snd
+        case env of
+            Just env' -> return env'
+            Nothing -> do
+                env' <- defaultClientEnv
+                WithLocalHost . modify' $ \(x, _) -> (x, Just env')
+                return env'
+
+-- | Run a 'WithLocalHost' monad
+runWithLocalHost :: LocalHost -> WithLocalHost a -> IO a
+runWithLocalHost host (WithLocalHost m) = evalStateT m (host, Nothing)
+
+-- | Monad with access to a remote host.
+newtype WithRemoteHost a = WithRemoteHost (StateT (RemoteHost, Maybe ClientEnv) IO a)
+                        deriving (Applicative, Functor, Monad, MonadIO, MonadCatch, MonadThrow, MonadMask)
+
+instance HasClient WithRemoteHost where
+    askHost = WithRemoteHost . gets $ HRemoteHost . fst
+    askClientEnv = do
+        env <- WithRemoteHost . gets $ snd
+        case env of
+            Just env' -> return env'
+            Nothing -> do
+                env' <- defaultClientEnv
+                WithRemoteHost . modify' $ \(x, _) -> (x, Just env')
+                return env'
+
+-- | Run a 'WithRemoteHost' monad
+runWithRemoteHost :: RemoteHost -> WithRemoteHost a -> IO a
+runWithRemoteHost host (WithRemoteHost m) = evalStateT m (host, Nothing)
 
 -- | List all container names.
 lxcList :: HasClient m => m [ContainerName]
