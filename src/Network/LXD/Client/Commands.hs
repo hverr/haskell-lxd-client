@@ -28,6 +28,14 @@ module Network.LXD.Client.Commands (
 , lxcFilePullRecursive
 , lxcFilePushRecursive
 , lxcFilePushRecursiveAttrs
+
+  -- * Images
+, lxcImageList
+, lxcImageAliases
+, lxcImageInfo
+, lxcImageAlias
+, lxcImageCreate
+, lxcImageDelete
 ) where
 
 import Network.LXD.Prelude
@@ -336,6 +344,36 @@ lxcFilePushRecursiveAttrs name src dst uid gid = do
     go file = lxcFilePushRecursiveAttrs name src' dst' uid gid
       where src' = src </> file
             dst' = dst </> file
+
+-- | List all image IDs.
+lxcImageList :: HasClient m => m [ImageId]
+lxcImageList = runClient $ imageIds >>= checkResponseOK
+
+-- | List al image aliases.
+lxcImageAliases :: HasClient m => m [ImageAliasName]
+lxcImageAliases = runClient $ imageAliases >>= checkResponseOK
+
+-- | Get image information.
+lxcImageInfo :: HasClient m => ImageId -> m Image
+lxcImageInfo = runClient . image >=> checkResponseOK
+
+-- | Get image alias information.
+lxcImageAlias :: HasClient m => ImageAliasName -> m ImageAlias
+lxcImageAlias = runClient . imageAlias >=> checkResponseOK
+
+-- | Create an image.
+lxcImageCreate :: HasClient m => ImageCreateRequest -> m ()
+lxcImageCreate req = runClient $ do
+    op <- imageCreate req >>= checkResponseCreated
+    _  <- operationWait op >>= checkResponseOK
+    return ()
+
+-- | Delete an image.
+lxcImageDelete :: HasClient m => ImageId -> m ()
+lxcImageDelete img = runClient $ do
+    op <- imageDelete img def >>= checkResponseCreated
+    _  <- operationWait op >>= checkResponseOK
+    return ()
 
 -- | Run a client operation.
 runClient :: HasClient m => ClientM a -> m a
