@@ -8,10 +8,10 @@ module Network.LXD.Client.Remotes where
 import Network.LXD.Prelude
 
 imagesRemote :: String
-imagesRemote = "images"
+imagesRemote = "https://images.linuxcontainers.org"
 
 ubuntuRemote :: String
-ubuntuRemote = "ubuntu"
+ubuntuRemote = "https://cloud-images.ubuntu.com/releases"
 
 ubuntuDailyRemote :: String
-ubuntuDailyRemote = "ubuntu-daily"
+ubuntuDailyRemote = "https://cloud-images.ubuntu.com/daily"
