@@ -5,14 +5,17 @@ module Network.LXD.Client (
 , module Network.LXD.Client.Types
 
   -- * LXD Host Management
+  -- ** HTTPS Clients
 , RemoteHost(..)
 , ClientAuth(..)
 , ServerAuth(..)
-
-  -- * HTTPS Clients
 , remoteHostClient
 , remoteHostManager
 , clientManager
+
+  -- * Unix Clients
+, LocalHost(..)
+, localHostClient
 
   -- * WebSockets Clients
 , runWebSockets
@@ -36,7 +39,7 @@ import Network.LXD.Client.API
 import Network.LXD.Client.Types
 
 import Network.Connection (ConnectionParams(..), TLSSettings(..), initConnectionContext)
-import Network.HTTP.Client (Manager, ManagerSettings, newManager)
+import Network.HTTP.Client (Manager, ManagerSettings(..), newManager, defaultManagerSettings, socketConnection)
 import Network.HTTP.Client.TLS (mkManagerSettings)
 import Network.TLS (ClientHooks(onCertificateRequest, onServerCertificate),
                     ClientParams(clientShared, clientHooks, clientSupported),
@@ -47,10 +50,11 @@ import Network.TLS (ClientHooks(onCertificateRequest, onServerCertificate),
                     defaultParamsClient)
 import Network.TLS.Extra.Cipher (ciphersuite_all)
 import qualified Network.Connection as Con
+import qualified Network.Socket as Socket
 import qualified Network.WebSockets as WS
 import qualified Network.WebSockets.Stream as WS
 
-import Servant.Client (BaseUrl(..), ClientEnv(..), Scheme(Https))
+import Servant.Client (BaseUrl(..), ClientEnv(..), Scheme(Http, Https))
 
 import System.Directory (getHomeDirectory)
 import System.IO.Error (catchIOError, isEOFError)
@@ -75,6 +79,14 @@ instance Default RemoteHost where
                      , remoteHostBasePath = ""
                      , remoteHostClientKey = DefaultClientAuth
                      , remoteHostCertificate = DefaultCAStore }
+
+-- | A structure containing everything to connect to a lcoal LXD host.
+newtype LocalHost = LocalHost {
+    localHostUnix :: FilePath             -- ^ The path to the local unix socket.
+  }
+
+instance Default LocalHost where
+    def = LocalHost { localHostUnix = "/var/lib/lxd/unix.socket" }
 
 -- | Specifies the client authentication method.
 data ClientAuth = NoClientAuth              -- ^ Do not authenticate the client.
@@ -158,6 +170,17 @@ clientConnectionParams RemoteHost{..} = do
                             , connectionPort = fromIntegral remoteHostPort
                             , connectionUseSecure = Just tlsSettings
                             , connectionUseSocks = Nothing }
+
+localHostClient :: MonadIO m => LocalHost -> m ClientEnv
+localHostClient LocalHost{..} = do
+    m <- liftIO $ newManager defaultManagerSettings { managerRawConnection = createUnixConnection }
+    return $ ClientEnv m baseUrl
+  where
+    createUnixConnection = return $ \_ _ _ -> do
+        s <- Socket.socket Socket.AF_UNIX Socket.Stream Socket.defaultProtocol
+        Socket.connect s (Socket.SockAddrUnix localHostUnix)
+        socketConnection s 4096
+    baseUrl = BaseUrl Http "localhost" 80 ""
 
 runWebSockets :: (MonadError String m, MonadIO m) => RemoteHost -> String -> WS.ClientApp a -> m a
 runWebSockets host path app = do
