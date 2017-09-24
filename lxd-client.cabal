@@ -18,6 +18,7 @@ library
   exposed-modules:     Network.LXD.Client
                      , Network.LXD.Client.API
                      , Network.LXD.Client.Commands
+                     , Network.LXD.Client.Remotes
                      , Network.LXD.Client.Types
                      , Network.LXD.Prelude
   build-depends:       base >= 4.7 && < 5

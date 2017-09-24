@@ -3,8 +3,19 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 module Network.LXD.Client.Commands (
+  -- * Re-exports
+  def
+  -- ** Remotes
+, module Network.LXD.Client.Remotes
+
+  -- ** Containers
+, containerCreateRequest
+, ContainerSource(..)
+  -- ** Images
+, remoteImage
+
   -- * Running commands
-  HasClient(..)
+, HasClient(..)
 , defaultClientEnv
 , WithLocalHost, runWithLocalHost
 , WithRemoteHost, runWithRemoteHost
@@ -70,6 +81,7 @@ import System.Posix.Files (getFileStatus, fileMode, setFileMode)
 import qualified System.IO as IO
 
 import Network.LXD.Client
+import Network.LXD.Client.Remotes
 
 -- | A host that can be connected to.
 data Host = HLocalHost LocalHost
@@ -151,17 +163,13 @@ lxcList = runClient $ containerNames >>= checkResponseOK
 
 -- | Create a new container.
 lxcCreate :: HasClient m => ContainerCreateRequest -> m ()
-lxcCreate req = runClient $ do
-    op <- containerCreate req >>= checkResponseCreated
-    _  <- operationWait op >>= checkResponseOK
-    return ()
+lxcCreate req = runClient $ containerCreate req >>= checkResponseCreated >>= waitOperation
 
 -- | Delete a container.
 lxcDelete :: HasClient m => ContainerName -> m ()
-lxcDelete n = runClient $ do
-    op <- containerDelete n ContainerDeleteRequest >>= checkResponseCreated
-    _  <- operationWait op >>= checkResponseOK
-    return ()
+lxcDelete n = runClient $ containerDelete n ContainerDeleteRequest
+                          >>= checkResponseCreated
+                          >>= waitOperation
 
 -- | Get information about a container.
 lxcInfo :: HasClient m => ContainerName -> m Container
@@ -432,17 +440,11 @@ lxcImageAlias = runClient . imageAlias >=> checkResponseOK
 
 -- | Create an image.
 lxcImageCreate :: HasClient m => ImageCreateRequest -> m ()
-lxcImageCreate req = runClient $ do
-    op <- imageCreate req >>= checkResponseCreated
-    _  <- operationWait op >>= checkResponseOK
-    return ()
+lxcImageCreate req = runClient $ imageCreate req >>= checkResponseCreated >>= waitOperation
 
 -- | Delete an image.
 lxcImageDelete :: HasClient m => ImageId -> m ()
-lxcImageDelete img = runClient $ do
-    op <- imageDelete img def >>= checkResponseCreated
-    _  <- operationWait op >>= checkResponseOK
-    return ()
+lxcImageDelete img = runClient $ imageDelete img def >>= checkResponseCreated >>= waitOperation
 
 -- | Run a client operation.
 runClient :: HasClient m => ClientM a -> m a
@@ -499,3 +501,18 @@ checkResponseCreatedMetadata :: MonadThrow m => AsyncResponse a -> m a
 checkResponseCreatedMetadata Response{..}
     | 100 <- statusCode = return $ backgroundOperationMetadata metadata
     | otherwise = throwM $ StatusError 100 statusCode
+
+-- | Wait for an operation, and check whether it was successfull
+waitOperation :: OperationId -> ClientM ()
+waitOperation op = do
+    Operation{..} <- operationWait op >>= checkResponseOK
+    unless (operationStatusCode == 200) $ throwM (OperationError operationErr)
+
+
+-- | Exception raised when the operation was unsuccessful.
+newtype OperationError = OperationError String
+
+instance Show OperationError where
+    show (OperationError err) = "Operation unsuccessful: " ++ err
+
+instance Exception OperationError where

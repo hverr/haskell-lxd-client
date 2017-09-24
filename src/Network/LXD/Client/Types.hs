@@ -80,6 +80,8 @@ module Network.LXD.Client.Types (
 , LocalImageByAlias(..)
 , LocalImageByFingerprint(..)
 , RemoteImage(..)
+, remoteImage
+, remoteImageId
 
   -- * Operations
 , OperationId(..)
@@ -338,6 +340,22 @@ data RemoteImage = RemoteImage {
   , remoteImageCertificate :: Maybe String
   , remoteImageAliasOrFingerprint :: Either ImageAliasName ImageId
   } deriving (Show)
+
+-- | Create a remote image reference form a public remote.
+remoteImage :: String -> ImageAliasName -> RemoteImage
+remoteImage server alias = RemoteImage {
+    remoteImageServer = server
+  , remoteImageSecret = Nothing
+  , remoteImageCertificate = Nothing
+  , remoteImageAliasOrFingerprint = Left alias }
+
+-- | Create a remote image reference form a public remote, using an image ID.
+remoteImageId :: String -> ImageId -> RemoteImage
+remoteImageId server img = RemoteImage {
+    remoteImageServer = server
+  , remoteImageSecret = Nothing
+  , remoteImageCertificate = Nothing
+  , remoteImageAliasOrFingerprint = Right img }
 
 -- | LXD delete container request object.
 --

@@ -86,7 +86,7 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> "1.0" :> "operations" :> Get '[JSON] (Response AllOperations)
       :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Get '[JSON] (Response Operation)
       :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Delete '[JSON] (Response Value)
-      :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> "wait" :> Get '[JSON] (Response Value)
+      :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> "wait" :> Get '[JSON] (Response Operation)
 
 
 api :: Proxy API
@@ -114,7 +114,7 @@ imageDelete                          :: ImageId -> ImageDeleteRequest -> ClientM
 operationIds                         :: ClientM (Response AllOperations)
 operation                            :: OperationId -> ClientM (Response Operation)
 operationCancel                      :: OperationId -> ClientM (Response Value)
-operationWait                        :: OperationId -> ClientM (Response Value)
+operationWait                        :: OperationId -> ClientM (Response Operation)
 
 supportedVersions                        :<|>
     apiConfig                            :<|>
