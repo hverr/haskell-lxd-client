@@ -24,7 +24,7 @@ module Network.LXD.Prelude (
 import Prelude hiding (error)
 
 -- Monads
-import Control.Monad (join, unless, void)
+import Control.Monad (join, unless, void, when)
 
 -- Monad transformers
 import Control.Monad.Except (MonadError, ExceptT, runExceptT, throwError)

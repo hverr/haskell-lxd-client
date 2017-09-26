@@ -89,6 +89,11 @@ module Network.LXD.Client.Types (
 , AllOperations(..)
 , Operation(..)
 
+  -- * Events
+, EventType(..)
+, Event(..)
+, EventMetadata(..)
+
   -- * Servant Helpers
 , JsonOrBinary
 ) where
@@ -109,7 +114,7 @@ import Network.HTTP.Media.MediaType (MediaType, (//))
 
 import Servant.API.ContentTypes (Accept(..), MimeUnrender(..))
 
-import Web.Internal.HttpApiData (FromHttpApiData, ToHttpApiData(..))
+import Web.Internal.HttpApiData (FromHttpApiData(..), ToHttpApiData(..))
 
 -- | Generic LXD API response object.
 data GenericResponse op a = Response {
@@ -790,6 +795,47 @@ instance FromJSON Operation where
         <*> v .: "metadata"
         <*> v .: "may_cancel"
         <*> v .: "err"
+
+-- | Type of an LXD event from the @\/1.0\/events@ handle.
+data EventType = EventTypeLogging
+               | EventTypeOperation
+               deriving (Eq, Show)
+
+instance ToHttpApiData EventType where
+    toUrlPiece EventTypeLogging   = "logging"
+    toUrlPiece EventTypeOperation = "operation"
+
+instance FromHttpApiData EventType where
+    parseUrlPiece "logging"   = Right EventTypeLogging
+    parseUrlPiece "operation" = Right EventTypeOperation
+    parseUrlPiece t           = Left $ "unknown event type: " <> t
+
+instance FromJSON EventType where
+    parseJSON = withText "EventType" $ \t -> case t of
+        "logging"   -> return EventTypeLogging
+        "operation" -> return EventTypeOperation
+        t'          -> fail $ "unknown event type: " ++ show t'
+
+-- | An event received from @\/1.0\/events@.
+data Event = Event {
+    eventTimestamp :: String
+  , eventType :: EventType
+  , eventMetadata :: EventMetadata
+} deriving (Show)
+
+instance FromJSON Event where
+    parseJSON = withObject "Event" $ \v -> do
+        eventTimestamp <- v .: "timestamp"
+        eventType <- (v .: "type") >>= parseJSON
+        eventMetadata <- case eventType of
+            EventTypeLogging   -> EventLoggingMetadata   <$> (v .: "metadata")
+            EventTypeOperation -> EventOperationMetadata <$> (v .: "metadata")
+        return Event{..}
+
+-- | Metadata of an event.
+data EventMetadata = EventLoggingMetadata Value
+                   | EventOperationMetadata Operation
+                   deriving (Show)
 
 -- | The type of a generic response object.
 data ResponseType = Sync | Async deriving (Eq, Show)
