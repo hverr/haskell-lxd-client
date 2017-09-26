@@ -16,6 +16,7 @@ module Network.LXD.Client.Types (
 , Response
 , AsyncResponse
 , ResponseType(..)
+, StatusCode(..)
   -- ** Background operations
 , BackgroundOperation(..)
 
@@ -88,6 +89,7 @@ module Network.LXD.Client.Types (
 , OperationStatus
 , AllOperations(..)
 , Operation(..)
+, OperationProgress(..)
 
   -- * Events
 , EventType(..)
@@ -99,15 +101,18 @@ module Network.LXD.Client.Types (
 ) where
 
 import Network.LXD.Prelude
+import qualified Prelude as P
 
 import Data.Aeson
+import Data.Bimap (Bimap)
 import Data.ByteString.Lazy (ByteString)
 import Data.Default
 import Data.List (stripPrefix)
 import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.Map.Strict (Map)
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, fromMaybe)
 import Data.Text (pack, unpack)
+import qualified Data.Bimap as Bimap
 import qualified Data.Map.Strict as Map
 
 import Network.HTTP.Media.MediaType (MediaType, (//))
@@ -120,7 +125,7 @@ import Web.Internal.HttpApiData (FromHttpApiData(..), ToHttpApiData(..))
 data GenericResponse op a = Response {
     responseType :: ResponseType
   , status :: String
-  , statusCode :: Int
+  , statusCode :: StatusCode
   , responseOperation :: op
   , errorCode :: Int
   , error :: String
@@ -150,7 +155,7 @@ data BackgroundOperation m = BackgroundOperation {
   , backgroundOperationCreatedAt :: String
   , backgroundOperationUpdatedAt :: String
   , backgroundOperationStatus :: String
-  , backgroundOperationStatusCode :: Int
+  , backgroundOperationStatusCode :: StatusCode
   , backgroundOperationMetadata :: m
   , backgroundOperationMayCancel :: Bool
   , backgroundOperationeErr :: String
@@ -778,7 +783,7 @@ data Operation = Operation {
   , operationCreatedAt :: String
   , operationUpdatedAt :: String
   , operationStatus :: OperationStatus
-  , operationStatusCode :: Int
+  , operationStatusCode :: StatusCode
   , operationMetadata :: Value
   , operationMayCancel :: Bool
   , operationErr :: String
@@ -795,6 +800,18 @@ instance FromJSON Operation where
         <*> v .: "metadata"
         <*> v .: "may_cancel"
         <*> v .: "err"
+
+-- | Progress of an LXD operation.
+--
+-- You can try to decode 'operationMetadata' if the 'operationStatusCode' is
+-- 'SRunning' to see of the operation contains progress information.
+--
+-- The embedded 'String' value is in the format @87% (12.04 MB/s)@.
+newtype OperationProgress = OperationProgress String deriving (Show)
+
+instance FromJSON OperationProgress where
+    parseJSON = withObject "OperationProgress" $ \v ->
+        OperationProgress <$> (v .: "download_progress")
 
 -- | Type of an LXD event from the @\/1.0\/events@ handle.
 data EventType = EventTypeLogging
@@ -845,6 +862,38 @@ instance FromJSON ResponseType where
         "sync"  -> pure Sync
         "async" -> pure Async
         v       -> fail $ "Unknown value: " ++ show v
+
+data StatusCode = SCreated
+                | SStopped
+                | SRunning
+                | SSuccess
+                | SFailure
+                | SCancelled
+                | SOther Int
+                deriving (Eq, Ord, Show)
+
+statusCodeMap :: Bimap Int StatusCode
+statusCodeMap = Bimap.fromList [
+    (100, SCreated)
+  , (102, SStopped)
+  , (103, SRunning)
+  , (200, SSuccess)
+  , (400, SFailure)
+  , (401, SCancelled)
+  ]
+
+statusCodeFromInt :: Int -> StatusCode
+statusCodeFromInt v = fromMaybe (SOther v) $ Bimap.lookup v statusCodeMap
+
+statusCodeToInt :: StatusCode -> Int
+statusCodeToInt (SOther v) = v
+statusCodeToInt c = fromMaybe (P.error $ "unindexed status code: " ++ show c) $ Bimap.lookupR c statusCodeMap
+
+instance FromJSON StatusCode where
+    parseJSON v = statusCodeFromInt <$> parseJSON v
+
+instance ToJSON StatusCode where
+    toJSON = toJSON . statusCodeToInt
 
 -- | LXD API version string, e.g. 1.0.
 newtype ApiVersion = ApiVersion String deriving (Eq, Show)

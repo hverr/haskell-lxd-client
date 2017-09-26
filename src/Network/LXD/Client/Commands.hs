@@ -59,16 +59,17 @@ module Network.LXD.Client.Commands (
 
 import Network.LXD.Prelude
 
-import Control.Concurrent.Async (Async, async, withAsync, wait)
+import Control.Concurrent.Async (Async, async, withAsync, wait, uninterruptibleCancel)
 import Control.Concurrent.MVar
 import Control.Monad ((>=>))
-import Control.Monad.Catch (Exception, SomeException, MonadThrow, throwM, MonadCatch, catch, MonadMask)
+import Control.Monad.Catch (Exception, SomeException, MonadThrow, throwM, MonadCatch, catch, MonadMask, bracket)
 import Control.Monad.State (StateT, evalStateT, gets, modify')
 
 import Data.ByteString.Lazy (ByteString)
 import Data.Default (def)
 import Data.List (inits)
 import Data.Map.Strict (Map)
+import qualified Data.Aeson.Types as Aeson
 import qualified Data.ByteString.Lazy as BL
 
 import Numeric (readOct, showOct)
@@ -81,6 +82,7 @@ import System.Posix.Files (getFileStatus, fileMode, setFileMode)
 import qualified System.IO as IO
 
 import Network.LXD.Client
+import Network.LXD.Client.Events
 import Network.LXD.Client.Remotes
 
 -- | A host that can be connected to.
@@ -88,7 +90,7 @@ data Host = HLocalHost LocalHost
           | HRemoteHost RemoteHost
 
 -- | Monad with access to a 'ClientEnv'.
-class (MonadIO m, MonadThrow m) => HasClient m where
+class (MonadIO m, MonadMask m) => HasClient m where
     -- | Return the LXD remote host to connect to.
     askHost :: m Host
 
@@ -163,13 +165,12 @@ lxcList = runClient $ containerNames >>= checkResponseOK
 
 -- | Create a new container.
 lxcCreate :: HasClient m => ContainerCreateRequest -> m ()
-lxcCreate req = runClient $ containerCreate req >>= checkResponseCreated >>= waitOperation
+lxcCreate req = runAndWait $ containerCreate req >>= checkResponseCreated
 
 -- | Delete a container.
 lxcDelete :: HasClient m => ContainerName -> m ()
-lxcDelete n = runClient $ containerDelete n ContainerDeleteRequest
-                          >>= checkResponseCreated
-                          >>= waitOperation
+lxcDelete n = runAndWait $ containerDelete n ContainerDeleteRequest
+                           >>= checkResponseCreated
 
 -- | Get information about a container.
 lxcInfo :: HasClient m => ContainerName -> m Container
@@ -440,11 +441,11 @@ lxcImageAlias = runClient . imageAlias >=> checkResponseOK
 
 -- | Create an image.
 lxcImageCreate :: HasClient m => ImageCreateRequest -> m ()
-lxcImageCreate req = runClient $ imageCreate req >>= checkResponseCreated >>= waitOperation
+lxcImageCreate req = runAndWait $ imageCreate req >>= checkResponseCreated
 
 -- | Delete an image.
 lxcImageDelete :: HasClient m => ImageId -> m ()
-lxcImageDelete img = runClient $ imageDelete img def >>= checkResponseCreated >>= waitOperation
+lxcImageDelete img = runAndWait $ imageDelete img def >>= checkResponseCreated
 
 -- | Run a client operation.
 runClient :: HasClient m => ClientM a -> m a
@@ -474,8 +475,8 @@ instance Exception ClientError where
 
 -- | Exception raised when the status of a response was unexpected.
 data StatusError = StatusError {
-    statusErrorExpected :: Int
-  , statusErrorReceived :: Int }
+    statusErrorExpected :: StatusCode
+  , statusErrorReceived :: StatusCode }
 
 instance Show StatusError where
     show StatusError{..} = "Unexpected response with code "
@@ -487,27 +488,51 @@ instance Exception StatusError where
 -- | Check the validity of a synchronous response.
 checkResponseOK :: MonadThrow m => Response a -> m a
 checkResponseOK Response{..}
-    | 200 <- statusCode = return metadata
-    | otherwise = throwM $ StatusError 200 statusCode
+    | SSuccess <- statusCode = return metadata
+    | otherwise = throwM $ StatusError SSuccess statusCode
 
 -- | Check the validity of an asynchronous response.
 checkResponseCreated :: MonadThrow m => AsyncResponse a -> m OperationId
 checkResponseCreated Response{..}
-    | 100 <- statusCode = return responseOperation
-    | otherwise = throwM $ StatusError 100 statusCode
+    | SCreated <- statusCode = return responseOperation
+    | otherwise = throwM $ StatusError SCreated statusCode
 
 -- | Check the validity of an asynchronous response and return the metadata.
 checkResponseCreatedMetadata :: MonadThrow m => AsyncResponse a -> m a
 checkResponseCreatedMetadata Response{..}
-    | 100 <- statusCode = return $ backgroundOperationMetadata metadata
-    | otherwise = throwM $ StatusError 100 statusCode
+    | SCreated <- statusCode = return $ backgroundOperationMetadata metadata
+    | otherwise = throwM $ StatusError SCreated statusCode
 
 -- | Wait for an operation, and check whether it was successfull
-waitOperation :: OperationId -> ClientM ()
-waitOperation op = do
-    Operation{..} <- operationWait op >>= checkResponseOK
-    unless (operationStatusCode == 200) $ throwM (OperationError operationErr)
+runAndWait :: HasClient m => ClientM OperationId -> m ()
+runAndWait op = do
+    oid  <- liftIO newEmptyMVar
+    ops  <- liftIO newEmptyMVar
+    host <- askHost
 
+    let err = throwM . OperationError
+    let waitForDone = do
+        op' <- liftIO $ takeMVar ops
+        case operationStatusCode op' of
+            SSuccess   -> return ()
+            SStopped   -> err "Operation unexpectedly stopped"
+            SCancelled -> err "Opeartion unexpectedly cancelled"
+            SFailure   -> err $ "Operation failed: " ++ operationErr op'
+            SRunning   -> printProgress op' >> waitForDone
+            _           -> waitForDone
+
+    bracket
+        (liftIO . async . runWebSockets host operationsPath $ listenForOperation oid ops)
+        (liftIO . uninterruptibleCancel) $ \_ -> do
+            oid' <- runClient op
+            liftIO $ putMVar oid oid'
+            waitForDone
+  where
+    printProgress op' = case Aeson.fromJSON (operationMetadata op') of
+        Aeson.Error _ -> return ()
+        Aeson.Success (OperationProgress p) -> liftIO $ do
+            IO.hPutStr IO.stderr $ "Progres: " ++ p ++ "\r"
+            IO.hFlush IO.stderr
 
 -- | Exception raised when the operation was unsuccessful.
 newtype OperationError = OperationError String
