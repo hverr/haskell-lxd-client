@@ -53,6 +53,11 @@ testSuite = describe "containers" $ do
         out <- withContainer $ \name -> lxcExec name "/bin/cat" [] "Hello World!"
         out `shouldBe` "Hello World!"
 
+    it "should pull files" $ do
+        out <- withContainer $ \name -> lxcFilePullRaw name "/etc/resolv.conf"
+        logOK $ "Contents of /etc/resolv.conf: " ++ show out
+        out `shouldNotBe` ""
+
 
 randomContainerName :: IO ContainerName
 randomContainerName = ContainerName . T.unpack . ("lxd-test-suite-" <>) . UUID.toText <$> randomIO
