@@ -83,6 +83,7 @@ test-suite lxd-client-integration
   other-modules:
   build-depends:       base
                      , lxd-client
+                     , exceptions
                      , hspec
                      , hspec-core
                      , random

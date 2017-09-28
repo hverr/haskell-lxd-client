@@ -2,8 +2,8 @@ module Main where
 
 import Network.LXD.Prelude hiding (log)
 
+import Control.Monad.Catch (bracket, bracket_)
 import Control.Concurrent (threadDelay)
-import Control.Exception (bracket)
 
 import Data.Coerce (coerce)
 import Data.Text (Text)
@@ -37,7 +37,7 @@ runTestSuite :: IO ()
 runTestSuite = hspec testSuite
 
 testSuite :: Spec
-testSuite = describe "containers" $
+testSuite = describe "containers" $ do
     it "should create, start, stop and delete a container" $ runWithLocalHost def $ do
         name <- liftIO randomContainerName
         logOK $ "Creating " ++ show name
@@ -49,9 +49,24 @@ testSuite = describe "containers" $
         logOK "Stopping" >> lxcStop name False
         logOK "Deleting" >> lxcDelete name
 
+    it "should execute commands" $ do
+        out <- withContainer $ \name -> lxcExec name "/bin/cat" [] "Hello World!"
+        out `shouldBe` "Hello World!"
+
+
 randomContainerName :: IO ContainerName
 randomContainerName = ContainerName . T.unpack . ("lxd-test-suite-" <>) . UUID.toText <$> randomIO
 
+withContainer :: (ContainerName -> WithLocalHost a) -> IO a
+withContainer action = do
+    name <- randomContainerName
+    let create = lxcCreate . containerCreateRequest (coerce name)
+                           . ContainerSourceRemote
+                           $ remoteImage imagesRemote "alpine/3.4/amd64"
+    runWithLocalHost def $ bracket_
+        (logOK ("Creating " ++ show name) >> create >> lxcStart name)
+        (logOK "Stopping" >> lxcStop name True >> lxcDelete name)
+        (action name)
 
 --------------------------------------------------------------------------------
 
