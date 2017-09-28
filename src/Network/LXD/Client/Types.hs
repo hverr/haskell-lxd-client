@@ -43,6 +43,8 @@ module Network.LXD.Client.Types (
 , NetworkAddress(..)
 , NetworkCounters(..)
 , ContainerState(..)
+, ContainerPutState(..)
+, containerNewState
   -- ** Creating containers
 , ContainerCreateRequest(..)
 , containerCreateRequest
@@ -121,7 +123,7 @@ import Data.List (stripPrefix)
 import Data.List.NonEmpty (NonEmpty((:|)))
 import Data.Map.Strict (Map)
 import Data.Maybe (catMaybes, fromMaybe)
-import Data.Text (pack, unpack)
+import Data.Text (Text, pack, unpack)
 import qualified Data.Bimap as Bimap
 import qualified Data.Map.Strict as Map
 
@@ -391,7 +393,7 @@ instance FromJSON NetworkCounters where
 
 -- | State of an LXD container.
 --
--- Used when querying @GET \/1.0\/container\/\<name\>@.
+-- Used when querying @GET \/1.0\/container\/\<name\>\/state@.
 data ContainerState = ContainerState {
     containerStateStatus :: String
   , containerStateStatusCode :: StatusCode
@@ -416,6 +418,47 @@ instance FromJSON ContainerState where
         containerStatePid        <- v .: "pid"
         containerStateProcesses  <- v .: "processes"
         return ContainerState{..}
+
+-- | State change action for an LXD container, as used by 'ContainerPutState'.
+data StateAction = Stop
+                 | Start
+                 | Restart
+                 | Freeze
+                 | Unfreeze
+                 deriving (Eq, Show)
+
+instance ToJSON StateAction where
+    toJSON Stop     = toJSON ("stop"     :: Text)
+    toJSON Start    = toJSON ("start"    :: Text)
+    toJSON Restart  = toJSON ("restart"  :: Text)
+    toJSON Freeze   = toJSON ("freeze"   :: Text)
+    toJSON Unfreeze = toJSON ("unfreeze" :: Text)
+
+-- | State change request for an LXD container.
+--
+-- Used when querying @PUT \/1.0\/container\/\<name\>\/state@.
+data ContainerPutState = ContainerPutState {
+    containerPutStateAction :: StateAction
+  , containerPutStateTimeout :: Int
+  , containerPutStateForce :: Bool
+  , containerPutStateStateful :: Bool
+} deriving (Show)
+
+instance ToJSON ContainerPutState where
+    toJSON ContainerPutState{..} = object [
+        "action"   .= containerPutStateAction
+      , "timeout"  .= containerPutStateTimeout
+      , "force"    .= containerPutStateForce
+      , "stateful" .= containerPutStateStateful
+      ]
+
+containerNewState :: StateAction -> ContainerPutState
+containerNewState action = ContainerPutState {
+    containerPutStateAction = action
+  , containerPutStateTimeout = 30
+  , containerPutStateForce = False
+  , containerPutStateStateful = False
+  }
 
 -- | LXD create container request object.
 --

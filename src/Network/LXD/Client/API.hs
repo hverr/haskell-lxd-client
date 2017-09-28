@@ -21,6 +21,7 @@ module Network.LXD.Client.API (
 , containerRename
   -- *** State
 , containerState
+, containerPutState
   -- *** Executing commands
 , containerExecImmediate
 , containerExecWebsocketInteractive
@@ -81,6 +82,7 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> ReqBody '[JSON] ContainerPatch :> Patch '[JSON] (Response Value)
       :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> ReqBody '[JSON] ContainerRename :> Post '[JSON] (AsyncResponse Value)
       :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> "state" :> Get '[JSON] (Response ContainerState)
+      :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> "state" :> ReqBody '[JSON] ContainerPutState :> Put '[JSON] (AsyncResponse Value)
       :<|> ExecAPI 'ExecImmediate
       :<|> ExecAPI 'ExecWebsocketInteractive
       :<|> ExecAPI 'ExecWebsocketNonInteractive
@@ -113,6 +115,7 @@ containerPut                         :: ContainerName -> ContainerPut -> ClientM
 containerPatch                       :: ContainerName -> ContainerPatch -> ClientM (Response Value)
 containerRename                      :: ContainerName -> ContainerRename -> ClientM (AsyncResponse Value)
 containerState                       :: ContainerName -> ClientM (Response ContainerState)
+containerPutState                    :: ContainerName -> ContainerPutState -> ClientM (AsyncResponse Value)
 containerExecImmediate               :: ExecClient 'ExecImmediate
 containerExecWebsocketInteractive    :: ExecClient 'ExecWebsocketInteractive
 containerExecWebsocketNonInteractive :: ExecClient 'ExecWebsocketNonInteractive
@@ -141,6 +144,7 @@ supportedVersions                        :<|>
     containerPatch                       :<|>
     containerRename                      :<|>
     containerState                       :<|>
+    containerPutState                    :<|>
     containerExecImmediate               :<|>
     containerExecWebsocketInteractive    :<|>
     containerExecWebsocketNonInteractive :<|>
