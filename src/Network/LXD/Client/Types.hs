@@ -33,6 +33,9 @@ module Network.LXD.Client.Types (
   -- ** Querying information
 , ContainerName(..)
 , Container(..)
+  -- ** Configuration
+, ContainerPut(..)
+, ContainerPatch(..)
   -- ** Creating containers
 , ContainerCreateRequest(..)
 , containerCreateRequest
@@ -260,6 +263,46 @@ instance FromJSON Container where
         <*> v .: "status"
         <*> v .: "status_code"
         <*> v .: "last_used_at"
+
+-- | Used to set the configuration of an LXD container.
+--
+-- Used when querying @PUT \/1.0\/containers\/\<name\>@.
+data ContainerPut = ContainerPut {
+    containerPutArchitecture :: String
+  , containerPutConfig :: Map String String
+  , containerPutDevices :: Map String (Map String String)
+  , containerPutEphemeral :: Bool
+  , containerPutProfiles :: [String]
+} deriving (Show)
+
+instance ToJSON ContainerPut where
+    toJSON ContainerPut{..} = object[
+        "architecture" .= containerPutArchitecture
+      , "config"       .= containerPutConfig
+      , "devices"      .= containerPutDevices
+      , "ephemeral"    .= containerPutEphemeral
+      , "profiles"     .= containerPutProfiles
+      ]
+
+-- | Used to patch the configuration of an LXD container.
+--
+-- Used when querying @PATCH \/1.0\/containers\/\<name\>@.
+data ContainerPatch = ContainerPatch {
+    containerPatchArchitecture :: Maybe String
+  , containerPatchConfig :: Maybe (Map String String)
+  , containerPatchDevices :: Maybe (Map String (Map String String))
+  , containerPatchEphemeral :: Maybe Bool
+  , containerPatchProfiles :: Maybe [String]
+} deriving (Show)
+
+instance ToJSON ContainerPatch where
+    toJSON ContainerPatch{..} = object $ catMaybes [
+        (.=) <$> pure "architecture" <*> containerPatchArchitecture
+      , (.=) <$> pure "config"       <*> containerPatchConfig
+      , (.=) <$> pure "devices"      <*> containerPatchDevices
+      , (.=) <$> pure "ephemeral"    <*> containerPatchEphemeral
+      , (.=) <$> pure "profiles"     <*> containerPatchProfiles
+      ]
 
 -- | LXD create container request object.
 --

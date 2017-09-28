@@ -15,6 +15,9 @@ module Network.LXD.Client.API (
 , containerCreate
 , container
 , containerDelete
+  -- *** Configuration
+, containerPut
+, containerPatch
   -- *** Executing commands
 , containerExecImmediate
 , containerExecWebsocketInteractive
@@ -71,6 +74,8 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> "1.0" :> "containers" :> ReqBody '[JSON] ContainerCreateRequest :> Post '[JSON] (AsyncResponse Value)
       :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> Get '[JSON] (Response Container)
       :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> ReqBody '[JSON] ContainerDeleteRequest :> Delete '[JSON] (AsyncResponse Value)
+      :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> ReqBody '[JSON] ContainerPut :> Put '[JSON] (AsyncResponse Value)
+      :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> ReqBody '[JSON] ContainerPatch :> Patch '[JSON] (Response Value)
       :<|> ExecAPI 'ExecImmediate
       :<|> ExecAPI 'ExecWebsocketInteractive
       :<|> ExecAPI 'ExecWebsocketNonInteractive
@@ -99,6 +104,8 @@ containerNames                       :: ClientM (Response [ContainerName])
 containerCreate                      :: ContainerCreateRequest -> ClientM (AsyncResponse Value)
 container                            :: ContainerName -> ClientM (Response Container)
 containerDelete                      :: ContainerName -> ContainerDeleteRequest -> ClientM (AsyncResponse Value)
+containerPut                         :: ContainerName -> ContainerPut -> ClientM (AsyncResponse Value)
+containerPatch                       :: ContainerName -> ContainerPatch -> ClientM (Response Value)
 containerExecImmediate               :: ExecClient 'ExecImmediate
 containerExecWebsocketInteractive    :: ExecClient 'ExecWebsocketInteractive
 containerExecWebsocketNonInteractive :: ExecClient 'ExecWebsocketNonInteractive
@@ -123,6 +130,8 @@ supportedVersions                        :<|>
     containerCreate                      :<|>
     container                            :<|>
     containerDelete                      :<|>
+    containerPut                         :<|>
+    containerPatch                       :<|>
     containerExecImmediate               :<|>
     containerExecWebsocketInteractive    :<|>
     containerExecWebsocketNonInteractive :<|>
