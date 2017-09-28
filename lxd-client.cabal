@@ -38,6 +38,7 @@ library
                      , http-client
                      , http-client-tls
                      , http-media
+                     , http-types
                      , mtl
                      , network
                      , servant

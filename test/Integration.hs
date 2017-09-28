@@ -54,8 +54,8 @@ testSuite = describe "containers" $ do
         out `shouldBe` "Hello World!"
 
     it "should pull files" $ do
-        out <- withContainer $ \name -> lxcFilePullRaw name "/etc/resolv.conf"
-        logOK $ "Contents of /etc/resolv.conf: " ++ show out
+        out <- withContainer $ \name -> lxcFilePullRaw name "/etc/hostname"
+        logOK $ "Contents of /etc/hostname: " ++ show out
         out `shouldNotBe` ""
 
 

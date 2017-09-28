@@ -1,11 +1,13 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeOperators #-}
 module Network.LXD.Client.API (
   -- * API
+  FailureResponse(..)
   -- ** Information
-  supportedVersions
+, supportedVersions
 , apiConfig
 , trustedCertificates
 
@@ -58,18 +60,30 @@ module Network.LXD.Client.API (
 import Network.LXD.Prelude
 
 import Control.Concurrent (MVar, takeMVar)
-import Control.Exception (catch, throwIO)
+import Control.Exception (Exception, catch, throwIO)
+import Control.Monad.Reader (asks)
 
-import Data.Aeson (Value)
-import Data.ByteString.Lazy (ByteString)
+import Data.Aeson (FromJSON, Value, eitherDecode)
+import Data.ByteString.Lazy (ByteString, toStrict)
+import Data.List (find)
+import Data.Maybe (catMaybes)
 import Data.Proxy
+import Data.String (fromString)
+import Data.Text (Text)
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Lazy.Char8 as Char8
+
+import qualified Network.HTTP.Client as Client
+import qualified Network.HTTP.Types.Header as HTTP
+import qualified Network.HTTP.Types.Status as HTTP
+import qualified Network.WebSockets as WS
 
 import Servant.API
-import Servant.Client
+import Servant.Client hiding (FailureResponse)
+
+import Web.HttpApiData (FromHttpApiData, ToHttpApiData, toHeader, parseHeader)
 
 import Network.LXD.Client.Types
-import qualified Network.WebSockets as WS
 
 type API = Get '[JSON] (Response [ApiVersion])
       :<|> "1.0" :> Get '[JSON] (Response ApiConfig)
@@ -86,9 +100,6 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> ExecAPI 'ExecImmediate
       :<|> ExecAPI 'ExecWebsocketInteractive
       :<|> ExecAPI 'ExecWebsocketNonInteractive
-      :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> "files" :> QueryParam "path" FilePath :> Get '[JsonOrBinary] (Headers '[Header "X-LXD-Uid" Uid, Header "X-LXD-Gid" Gid, Header "X-LXD-Mode" FileMode, Header "X-LXD-Type" FileType] RawFileResponse)
-      :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> "files" :> QueryParam "path" FilePath :> Header "X-LXD-Uid" Uid :> Header "X-LXD-Gid" Gid :> Header "X-LXD-Mode" FileMode :> Header "X-LXD-Type" FileType :> Header "X-LXD-Write" String :> ReqBody '[OctetStream] ByteString :> Post '[JSON] (Response Value)
-      :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> "files" :> QueryParam "path" FilePath :> Delete '[JSON] (Response Value)
       :<|> "1.0" :> "images" :> Get '[JSON] (Response [ImageId])
       :<|> "1.0" :> "images" :> ReqBody '[JSON] ImageCreateRequest :> Post '[JSON] (AsyncResponse Value)
       :<|> "1.0" :> "images" :> "aliases" :> Get '[JSON] (Response [ImageAliasName])
@@ -119,9 +130,6 @@ containerPutState                    :: ContainerName -> ContainerPutState -> Cl
 containerExecImmediate               :: ExecClient 'ExecImmediate
 containerExecWebsocketInteractive    :: ExecClient 'ExecWebsocketInteractive
 containerExecWebsocketNonInteractive :: ExecClient 'ExecWebsocketNonInteractive
-containerGetPath'                    :: ContainerName -> Maybe FilePath -> ClientM (Headers '[Header "X-LXD-Uid" Uid, Header "X-LXD-Gid" Gid, Header "X-LXD-Mode" FileMode, Header "X-LXD-Type" FileType] RawFileResponse)
-containerPostPath'                   :: ContainerName -> Maybe FilePath -> Maybe Uid -> Maybe Gid -> Maybe FileMode -> Maybe FileType -> Maybe String -> ByteString -> ClientM (Response Value)
-containerDeletePath'                 :: ContainerName -> Maybe FilePath -> ClientM (Response Value)
 imageIds                             :: ClientM (Response [ImageId])
 imageCreate                          :: ImageCreateRequest -> ClientM (AsyncResponse Value)
 imageAliases                         :: ClientM (Response [ImageAliasName])
@@ -148,9 +156,6 @@ supportedVersions                        :<|>
     containerExecImmediate               :<|>
     containerExecWebsocketInteractive    :<|>
     containerExecWebsocketNonInteractive :<|>
-    containerGetPath'                    :<|>
-    containerPostPath'                   :<|>
-    containerDeletePath'                 :<|>
     imageIds                             :<|>
     imageCreate                          :<|>
     imageAliases                         :<|>
@@ -165,34 +170,34 @@ supportedVersions                        :<|>
 
 containerGetPath :: ContainerName -> FilePath -> ClientM PathResponse
 containerGetPath name fp = do
-    headers <- containerGetPath' name (Just fp)
-    let raw = getResponse headers
-    case getHeadersHList headers of
-        hUid `HCons` (hGid `HCons` (hMode `HCons` (hType `HCons` HNil))) -> do
-            fileType <- getType hType raw
-            case fileResponse fileType (rawFileResponseBody raw) of
-                Left err -> error' raw $ "Could not decode " ++ show fileType ++ ": " ++ err
-                Right file -> return PathResponse {
-                                  pathUid = getValueDef hUid 0
-                                , pathGid = getValueDef hGid 0
-                                , pathMode = getValueDef hMode "0700"
-                                , pathType = fileType
+    req <- pathRequest name fp
+    res <- performRequest req
+    let lookupHdr :: FromHttpApiData a => HTTP.HeaderName -> ClientM a
+        lookupHdr n = lookupHdr' n (Client.responseHeaders res)
+
+    hType <- lookupHdr "X-LXD-Type"
+    hUid  <- lookupHdr "X-LXD-Uid"
+    hGid  <- lookupHdr "X-LXD-Gid"
+    hMode <- lookupHdr "X-LXD-Mode"
+    case fileResponse hType (Client.responseBody res) of
+        Left err -> error' $ "Could not decode " ++ show hType ++ ": " ++ err
+        Right file -> return PathResponse {
+                                  pathUid = hUid
+                                , pathGid = hGid
+                                , pathMode = hMode
+                                , pathType = hType
                                 , getFile = file
                                 }
- where
-    getValueDef :: Header sym a -> a -> a
-    getValueDef (Header v) _   = v
-    getValueDef _          def = def
+  where
+    lookupHdr' :: FromHttpApiData a => HTTP.HeaderName -> [HTTP.Header] -> ClientM a
+    lookupHdr' n xs = case find ((== n) . fst) xs of
+        Nothing -> error' $ "Missing header in response: " ++ show n
+        Just (_, v) -> case parseHeader v of
+            Left err -> error' $ "Could not decode header " ++ show n
+                              ++ " with value " ++ show v ++ ": " ++ show err
+            Right v' -> return v'
 
-    getType :: Header sym FileType -> RawFileResponse -> ClientM FileType
-    getType (Header v) _   = return v
-    getType _          raw = error' raw "No X-LXD-Type header present"
-
-    error' (RawFileResponse mt bs) m = throwError DecodeFailure {
-        decodeError = m
-      , responseContentType = mt
-      , responseBody = bs
-      }
+    error' = liftIO . throwIO . DecodeError
 
 data WriteMode = ModeOverwrite | ModeAppend deriving (Show)
 
@@ -205,14 +210,28 @@ containerPostPath :: ContainerName
                   -> Maybe WriteMode
                   -> ByteString
                   -> ClientM (Response Value)
-containerPostPath name fp uid gid perm ftype mode =
-    containerPostPath' name (Just fp) uid gid perm (Just ftype) (mode' <$> mode)
+containerPostPath name fp uid gid perm ftype mode body = do
+    req <- pathRequest name fp
+    let hdrs = catMaybes [ hdr "X-LXD-Uid" <$> uid
+                         , hdr "X-LXD-Gid" <$> gid
+                         , hdr "X-LXD-Mode" <$> perm
+                         , hdr "X-LXD-Type" <$> Just ftype
+                         , hdr "X-LXD-Write" . mode' <$> mode ]
+    let req' = req { Client.requestHeaders = hdrs
+                   , Client.requestBody = Client.RequestBodyLBS body }
+
+    performJsonRequest req'
   where
-    mode' ModeOverwrite = "overwrite"
+    mode' ModeOverwrite = "overwrite" :: Text
     mode' ModeAppend    = "append"
 
+    hdr :: ToHttpApiData v => HTTP.HeaderName -> v -> HTTP.Header
+    hdr n v = (n, toHeader v)
+
 containerDeletePath :: ContainerName -> FilePath -> ClientM (Response Value)
-containerDeletePath name fp = containerDeletePath' name (Just fp)
+containerDeletePath name fp = do
+    res <- pathRequest name fp
+    performJsonRequest $ res { Client.method = "DELETE" }
 
 operationWebSocket :: OperationId -> Secret -> String
 operationWebSocket (OperationId oid) (Secret secret) =
@@ -240,3 +259,50 @@ writeAllWebSocket input con = do
 type ExecAPI a = "1.0" :> "containers" :> Capture "name" ContainerName :> "exec" :> ReqBody '[JSON] (ExecRequest a) :> Post '[JSON] (AsyncResponse (ExecResponseMetadata a))
 
 type ExecClient a = ContainerName -> ExecRequest a -> ClientM (AsyncResponse (ExecResponseMetadata a))
+
+pathRequest :: ContainerName -> FilePath -> ClientM Client.Request
+pathRequest (ContainerName name) fp = do
+    BaseUrl{..} <- askBaseUrl
+    return Client.defaultRequest {
+        Client.method = "GET"
+      , Client.host = fromString baseUrlHost
+      , Client.port = baseUrlPort
+      , Client.path = toStrict $ fromString baseUrlPath <> "/1.0/containers/" <> Char8.pack name <> "/files"
+      , Client.queryString = toStrict $ "?path=" <> Char8.pack fp
+      }
+
+performRequest :: Client.Request -> ClientM (Client.Response ByteString)
+performRequest req = do
+    m <- askManager
+    r <- liftIO $ Client.httpLbs req m
+
+    let status = Client.responseStatus r
+        statusCode' = HTTP.statusCode status
+    unless (statusCode' >= 200 && statusCode' < 300) $
+        liftIO . throwIO $ FailureResponse req r
+    return r
+
+performJsonRequest :: FromJSON a => Client.Request -> ClientM a
+performJsonRequest req = do
+    res <- performRequest req
+    case eitherDecode (Client.responseBody res) of
+        Left err -> liftIO . throwIO . DecodeError $ "Could not decode JSON body: " ++ err
+        Right v -> return v
+
+-- | Exception thrown in 'containerGetPath', 'containerDeletePath' and
+-- 'containerPostPath'.
+data FailureResponse = FailureResponse Client.Request (Client.Response ByteString) deriving (Show)
+
+instance Exception FailureResponse where
+
+-- | Exception thrown in 'containerGetPath', 'containerDeletePath' and
+-- 'containerPostPath'.
+newtype DecodeError = DecodeError String deriving (Show)
+
+instance Exception DecodeError where
+
+askBaseUrl :: ClientM BaseUrl
+askBaseUrl = asks $ \(ClientEnv _ url) -> url
+
+askManager :: ClientM Client.Manager
+askManager = asks $ \(ClientEnv mgr _) -> mgr
