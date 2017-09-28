@@ -545,15 +545,14 @@ runAndWait op = do
     host <- askHost
 
     let err = throwM . OperationError
-    let waitForDone = do
-        op' <- liftIO $ takeMVar ops
-        case operationStatusCode op' of
-            SSuccess   -> return ()
-            SStopped   -> err "Operation unexpectedly stopped"
-            SCancelled -> err "Opeartion unexpectedly cancelled"
-            SFailure   -> err $ "Operation failed: " ++ operationErr op'
-            SRunning   -> printProgress op' >> waitForDone
-            _           -> waitForDone
+    let waitForDone = do op' <- liftIO $ takeMVar ops
+                         case operationStatusCode op' of
+                             SSuccess   -> return ()
+                             SStopped   -> err "Operation unexpectedly stopped"
+                             SCancelled -> err "Opeartion unexpectedly cancelled"
+                             SFailure   -> err $ "Operation failed: " ++ operationErr op'
+                             SRunning   -> printProgress op' >> waitForDone
+                             _           -> waitForDone
 
     bracket
         (liftIO . async . runWebSockets host operationsPath $ listenForOperation oid ops)
