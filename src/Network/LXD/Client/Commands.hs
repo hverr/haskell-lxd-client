@@ -25,6 +25,11 @@ module Network.LXD.Client.Commands (
 , lxcCreate
 , lxcDelete
 , lxcInfo
+, lxcStart
+, lxcStop
+, lxcRestart
+, lxcFreeze
+, lxcUnfreeze
 
   -- * Exec
 , lxcExec
@@ -175,6 +180,35 @@ lxcDelete n = runAndWait $ containerDelete n ContainerDeleteRequest
 -- | Get information about a container.
 lxcInfo :: HasClient m => ContainerName -> m Container
 lxcInfo = runClient . (container >=> checkResponseOK)
+
+-- | Start a contianer.
+lxcStart :: HasClient m => ContainerName -> m ()
+lxcStart name = runAndWait $ containerPutState name s >>= checkResponseCreated
+  where s = containerNewState Start False
+
+-- | Stop a container.
+--
+-- The second flag forces the action.
+lxcStop :: HasClient m => ContainerName -> Bool -> m ()
+lxcStop name force = runAndWait $ containerPutState name s >>= checkResponseCreated
+  where s = containerNewState Stop force
+
+-- | Restart a container.
+--
+-- The second flag forces the action.
+lxcRestart :: HasClient m => ContainerName -> Bool -> m ()
+lxcRestart name force = runAndWait $ containerPutState name s >>= checkResponseCreated
+  where s = containerNewState Restart force
+
+-- | Freeze a container.
+lxcFreeze :: HasClient m => ContainerName -> m ()
+lxcFreeze name = runAndWait $ containerPutState name s >>= checkResponseCreated
+  where s = containerNewState Freeze False
+
+-- | Unfreeze a container.
+lxcUnfreeze :: HasClient m => ContainerName -> m ()
+lxcUnfreeze name = runAndWait $ containerPutState name s >>= checkResponseCreated
+  where s = containerNewState Unfreeze False
 
 -- | Execute a command, catch standard output, print stderr.
 lxcExec :: HasClient m

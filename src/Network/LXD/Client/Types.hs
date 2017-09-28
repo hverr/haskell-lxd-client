@@ -43,6 +43,7 @@ module Network.LXD.Client.Types (
 , NetworkAddress(..)
 , NetworkCounters(..)
 , ContainerState(..)
+, StateAction(..)
 , ContainerPutState(..)
 , containerNewState
   -- ** Creating containers
@@ -452,11 +453,11 @@ instance ToJSON ContainerPutState where
       , "stateful" .= containerPutStateStateful
       ]
 
-containerNewState :: StateAction -> ContainerPutState
-containerNewState action = ContainerPutState {
+containerNewState :: StateAction -> Bool -> ContainerPutState
+containerNewState action force = ContainerPutState {
     containerPutStateAction = action
   , containerPutStateTimeout = 30
-  , containerPutStateForce = False
+  , containerPutStateForce = force
   , containerPutStateStateful = False
   }
 
