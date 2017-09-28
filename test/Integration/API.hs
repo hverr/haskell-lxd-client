@@ -12,7 +12,6 @@ import Control.Monad ((>=>))
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Except (runExceptT)
 
-import Data.Aeson (object)
 import Data.Default (def)
 import Data.Maybe (fromJust)
 import qualified Data.ByteString as BS
@@ -105,8 +104,8 @@ testContainerCreateWaitDelete = do
       , containerCreateRequestArchitecture = "x86_64"
       , containerCreateRequestEphemeral = True
       , containerCreateRequestProfiles = ["default"]
-      , containerCreateRequestConfig = object []
-      , containerCreateRequestDevices = object []
+      , containerCreateRequestConfig = mempty
+      , containerCreateRequestDevices = mempty
       , containerCreateRequestInstanceType = Nothing
       , containerCreateRequestSource = ContainerSourceLocalByAlias "test-image"
       }
@@ -291,15 +290,10 @@ runTrusted action = do
 
 assertResponseOK :: Monad m => GenericResponse op a -> Test m a
 assertResponseOK Response{..}
-    | 200 <- statusCode = return metadata
+    | SSuccess <- statusCode = return metadata
     | otherwise = throwError $ "Expected response with code 200 but got " ++ show statusCode ++ " with error code " ++ show errorCode ++ " (" ++ show error ++ ")"
 
 assertResponseCreated :: Monad m => GenericResponse op a -> Test m a
 assertResponseCreated Response{..}
-    | 100 <- statusCode = return metadata
+    | SCreated <- statusCode = return metadata
     | otherwise = throwError $ "Exepected response with code 100 but got " ++ show statusCode
-
-assertResponseAccepted :: Monad m => GenericResponse op a -> Test m a
-assertResponseAccepted Response{..}
-    | 202 <- statusCode = return metadata
-    | otherwise = throwError $ "Exepected response with code 202 but got " ++ show statusCode

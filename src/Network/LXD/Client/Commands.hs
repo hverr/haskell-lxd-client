@@ -21,6 +21,7 @@ module Network.LXD.Client.Commands (
 , WithRemoteHost, runWithRemoteHost
 
   -- * Containers
+, ContainerName(..)
 , lxcList
 , lxcCreate
 , lxcDelete

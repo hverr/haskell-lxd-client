@@ -5,6 +5,7 @@ import Network.LXD.Prelude hiding (log)
 import Control.Concurrent (threadDelay)
 import Control.Exception (bracket)
 
+import Data.Coerce (coerce)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.UUID as UUID
@@ -14,6 +15,8 @@ import System.Random (randomIO)
 
 import Test.Hspec
 import Turtle (sh, procs, empty)
+
+import Network.LXD.Client.Commands
 
 main :: IO ()
 main = do
@@ -35,8 +38,20 @@ runTestSuite = hspec testSuite
 
 testSuite :: Spec
 testSuite = describe "containers" $
-    it "should create a container" $
-        True `shouldBe` True
+    it "should create, start, stop and delete a container" $ runWithLocalHost def $ do
+        name <- liftIO randomContainerName
+        logOK $ "Creating " ++ show name
+        lxcCreate . containerCreateRequest (coerce name)
+                  . ContainerSourceRemote
+                  $ remoteImage imagesRemote "alpine/3.4/amd64"
+
+        logOK "Starting" >> lxcStart name
+        logOK "Stopping" >> lxcStop name False
+        logOK "Deleting" >> lxcDelete name
+
+randomContainerName :: IO ContainerName
+randomContainerName = ContainerName . T.unpack . ("lxd-test-suite-" <>) . UUID.toText <$> randomIO
+
 
 --------------------------------------------------------------------------------
 
