@@ -36,6 +36,7 @@ module Network.LXD.Client.Types (
   -- ** Configuration
 , ContainerPut(..)
 , ContainerPatch(..)
+, ContainerRename(..)
   -- ** Creating containers
 , ContainerCreateRequest(..)
 , containerCreateRequest
@@ -303,6 +304,14 @@ instance ToJSON ContainerPatch where
       , (.=) <$> pure "ephemeral"    <*> containerPatchEphemeral
       , (.=) <$> pure "profiles"     <*> containerPatchProfiles
       ]
+
+-- | Used to rename a container to the given name.
+--
+-- Used when querying @POST \/1.0\/containers\/\<name\>@.
+newtype ContainerRename = ContainerRename String deriving (Show)
+
+instance ToJSON ContainerRename where
+    toJSON (ContainerRename name) = object [ "name" .= name ]
 
 -- | LXD create container request object.
 --

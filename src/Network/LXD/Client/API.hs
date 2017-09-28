@@ -18,6 +18,7 @@ module Network.LXD.Client.API (
   -- *** Configuration
 , containerPut
 , containerPatch
+, containerRename
   -- *** Executing commands
 , containerExecImmediate
 , containerExecWebsocketInteractive
@@ -76,6 +77,7 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> ReqBody '[JSON] ContainerDeleteRequest :> Delete '[JSON] (AsyncResponse Value)
       :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> ReqBody '[JSON] ContainerPut :> Put '[JSON] (AsyncResponse Value)
       :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> ReqBody '[JSON] ContainerPatch :> Patch '[JSON] (Response Value)
+      :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> ReqBody '[JSON] ContainerRename :> Post '[JSON] (AsyncResponse Value)
       :<|> ExecAPI 'ExecImmediate
       :<|> ExecAPI 'ExecWebsocketInteractive
       :<|> ExecAPI 'ExecWebsocketNonInteractive
@@ -106,6 +108,7 @@ container                            :: ContainerName -> ClientM (Response Conta
 containerDelete                      :: ContainerName -> ContainerDeleteRequest -> ClientM (AsyncResponse Value)
 containerPut                         :: ContainerName -> ContainerPut -> ClientM (AsyncResponse Value)
 containerPatch                       :: ContainerName -> ContainerPatch -> ClientM (Response Value)
+containerRename                      :: ContainerName -> ContainerRename -> ClientM (AsyncResponse Value)
 containerExecImmediate               :: ExecClient 'ExecImmediate
 containerExecWebsocketInteractive    :: ExecClient 'ExecWebsocketInteractive
 containerExecWebsocketNonInteractive :: ExecClient 'ExecWebsocketNonInteractive
@@ -132,6 +135,7 @@ supportedVersions                        :<|>
     containerDelete                      :<|>
     containerPut                         :<|>
     containerPatch                       :<|>
+    containerRename                      :<|>
     containerExecImmediate               :<|>
     containerExecWebsocketInteractive    :<|>
     containerExecWebsocketNonInteractive :<|>
