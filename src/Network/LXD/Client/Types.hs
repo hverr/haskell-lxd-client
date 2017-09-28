@@ -232,14 +232,14 @@ instance ToHttpApiData ContainerName where
 data Container = Container {
     containerArchitecture :: String
   , containerName :: String
-  , containerConfig :: Value
+  , containerConfig :: Map String String
   , containerCreatedAt :: String
-  , containerDevices :: Value
+  , containerDevices :: Map String (Map String String)
   , containerEphemeral :: Bool
   , containerProfiles :: [String]
   , containerStateful :: Bool
-  , containerExpandedConfig :: Value
-  , containerExpandedDevices :: Value
+  , containerExpandedConfig :: Map String String
+  , containerExpandedDevices :: Map String (Map String String)
   , containerStatus :: String
   , containerSatusCode :: Int
   , containerLastUsedAt :: String
@@ -269,8 +269,8 @@ data ContainerCreateRequest = ContainerCreateRequest {
   , containerCreateRequestArchitecture :: String
   , containerCreateRequestProfiles :: [String]
   , containerCreateRequestEphemeral :: Bool
-  , containerCreateRequestConfig :: Value
-  , containerCreateRequestDevices :: Value
+  , containerCreateRequestConfig :: Map String String
+  , containerCreateRequestDevices :: Map String (Map String String)
   , containerCreateRequestInstanceType :: Maybe String
   , containerCreateRequestSource :: ContainerSource
   } deriving (Show)
@@ -295,8 +295,8 @@ containerCreateRequest name src = ContainerCreateRequest {
   , containerCreateRequestArchitecture = "x86_64"
   , containerCreateRequestProfiles = ["default"]
   , containerCreateRequestEphemeral = False
-  , containerCreateRequestConfig = object []
-  , containerCreateRequestDevices = object []
+  , containerCreateRequestConfig = mempty
+  , containerCreateRequestDevices = mempty
   , containerCreateRequestInstanceType = Nothing
   , containerCreateRequestSource = src
   }
