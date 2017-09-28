@@ -19,6 +19,8 @@ module Network.LXD.Client.API (
 , containerPut
 , containerPatch
 , containerRename
+  -- *** State
+, containerState
   -- *** Executing commands
 , containerExecImmediate
 , containerExecWebsocketInteractive
@@ -78,6 +80,7 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> ReqBody '[JSON] ContainerPut :> Put '[JSON] (AsyncResponse Value)
       :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> ReqBody '[JSON] ContainerPatch :> Patch '[JSON] (Response Value)
       :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> ReqBody '[JSON] ContainerRename :> Post '[JSON] (AsyncResponse Value)
+      :<|> "1.0" :> "containers" :> Capture "name" ContainerName :> "state" :> Get '[JSON] (Response ContainerState)
       :<|> ExecAPI 'ExecImmediate
       :<|> ExecAPI 'ExecWebsocketInteractive
       :<|> ExecAPI 'ExecWebsocketNonInteractive
@@ -109,6 +112,7 @@ containerDelete                      :: ContainerName -> ContainerDeleteRequest 
 containerPut                         :: ContainerName -> ContainerPut -> ClientM (AsyncResponse Value)
 containerPatch                       :: ContainerName -> ContainerPatch -> ClientM (Response Value)
 containerRename                      :: ContainerName -> ContainerRename -> ClientM (AsyncResponse Value)
+containerState                       :: ContainerName -> ClientM (Response ContainerState)
 containerExecImmediate               :: ExecClient 'ExecImmediate
 containerExecWebsocketInteractive    :: ExecClient 'ExecWebsocketInteractive
 containerExecWebsocketNonInteractive :: ExecClient 'ExecWebsocketNonInteractive
@@ -136,6 +140,7 @@ supportedVersions                        :<|>
     containerPut                         :<|>
     containerPatch                       :<|>
     containerRename                      :<|>
+    containerState                       :<|>
     containerExecImmediate               :<|>
     containerExecWebsocketInteractive    :<|>
     containerExecWebsocketNonInteractive :<|>

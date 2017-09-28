@@ -37,6 +37,12 @@ module Network.LXD.Client.Types (
 , ContainerPut(..)
 , ContainerPatch(..)
 , ContainerRename(..)
+  -- ** State
+, MemoryState(..)
+, NetworkState(..)
+, NetworkAddress(..)
+, NetworkCounters(..)
+, ContainerState(..)
   -- ** Creating containers
 , ContainerCreateRequest(..)
 , containerCreateRequest
@@ -312,6 +318,104 @@ newtype ContainerRename = ContainerRename String deriving (Show)
 
 instance ToJSON ContainerRename where
     toJSON (ContainerRename name) = object [ "name" .= name ]
+
+-- | Memory state of an LXD container. As used by 'ContainerState'.
+data MemoryState = MemoryState {
+    memoryStateUsage :: Integer
+  , memoryStateUsagePeak :: Integer
+  , memoryStateSwapUsage :: Integer
+  , memoryStateSwapUsagePeak :: Integer
+} deriving (Show)
+
+instance FromJSON MemoryState where
+    parseJSON = withObject "MemoryState" $ \v -> do
+        memoryStateUsage         <- v .: "usage"
+        memoryStateUsagePeak     <- v .: "usage_peak"
+        memoryStateSwapUsage     <- v .: "swap_usage"
+        memoryStateSwapUsagePeak <- v .: "swap_usage_peak"
+        return MemoryState{..}
+
+-- | Network state of an LXD container network device. As used by 'ContainerState'.
+data NetworkState = NetworkState {
+    networkStateAddresses :: [NetworkAddress]
+  , networkStateCounters :: NetworkCounters
+  , networkStateHwaddr :: String
+  , networkStateHostName :: String
+  , networkStateMtu :: Int
+  , networkStateState :: String
+  , networkStateType :: String
+} deriving (Show)
+
+instance FromJSON NetworkState where
+    parseJSON = withObject "NetworkState" $ \v -> do
+        networkStateAddresses <- v .: "addresses"
+        networkStateCounters  <- v .: "counters"
+        networkStateHwaddr    <- v .: "hwaddr"
+        networkStateHostName  <- v .: "host_name"
+        networkStateMtu       <- v .: "mtu"
+        networkStateState     <- v .: "state"
+        networkStateType      <- v .: "type"
+        return NetworkState{..}
+
+-- | Network address of an LXD container network device. As used by 'NetworkState'.
+data NetworkAddress = NetworkAddress {
+    networkAddressFamily :: String
+  , networkAddressAddress :: String
+  , networkAddressNetmask :: String
+  , networkAddressScope :: String
+} deriving (Show)
+
+instance FromJSON NetworkAddress where
+    parseJSON = withObject "NetworkAddress" $ \v -> do
+        networkAddressFamily  <- v .: "family"
+        networkAddressAddress <- v .: "address"
+        networkAddressNetmask <- v .: "netmask"
+        networkAddressScope   <- v .: "scope"
+        return NetworkAddress{..}
+
+-- | Collection of statistics of an LXD container network device. As used by 'NetworkState'.
+data NetworkCounters = NetworkCounters {
+    networkCountersBytesReceived :: Integer
+  , networkCountersBytesSent :: Integer
+  , networkCountersPacketsReceived :: Integer
+  , networkCountersPacketsSent :: Integer
+} deriving (Show)
+
+instance FromJSON NetworkCounters where
+    parseJSON = withObject "NetworkCounters" $ \v -> do
+        networkCountersBytesReceived   <- v .: "bytes_received"
+        networkCountersBytesSent       <- v .: "bytes_sent"
+        networkCountersPacketsReceived <- v .: "packets_received"
+        networkCountersPacketsSent     <- v .: "packets_sent"
+        return NetworkCounters{..}
+
+-- | State of an LXD container.
+--
+-- Used when querying @GET \/1.0\/container\/\<name\>@.
+data ContainerState = ContainerState {
+    containerStateStatus :: String
+  , containerStateStatusCode :: StatusCode
+  , containerStateCpu :: Integer
+  , containerStateDisk :: Map String Integer
+  , containerStateMemory :: MemoryState
+  , containerStateNetwork :: Map String NetworkState
+  , containerStatePid :: Int
+  , containerStateProcesses :: Int
+} deriving (Show)
+
+instance FromJSON ContainerState where
+    parseJSON = withObject "ContainerState" $ \v -> do
+        cpu <- v .: "cpu"
+        let containerStateCpu = fromMaybe 0 $ Map.lookup ("usage" :: String) cpu
+
+        containerStateStatus     <- v .: "status"
+        containerStateStatusCode <- v .: "status_code"
+        containerStateDisk       <- v .: "disk"
+        containerStateMemory     <- v .: "memory"
+        containerStateNetwork    <- v .: "network"
+        containerStatePid        <- v .: "pid"
+        containerStateProcesses  <- v .: "processes"
+        return ContainerState{..}
 
 -- | LXD create container request object.
 --
