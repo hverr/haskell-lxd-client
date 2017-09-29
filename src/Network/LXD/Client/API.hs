@@ -66,6 +66,14 @@ module Network.LXD.Client.API (
 , poolPatch
 , poolDelete
 
+  -- * Volumes
+, volumeList
+, volumeCreate
+, volume
+, volumePut
+, volumePatch
+, volumeDelete
+
   -- ** Operations
 , operationIds
 , operation
@@ -148,6 +156,12 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> "1.0" :> "storage-pools" :> Capture "name" PoolName :> ReqBody '[JSON] PoolConfigRequest :> Put '[JSON] (Response Value)
       :<|> "1.0" :> "storage-pools" :> Capture "name" PoolName :> ReqBody '[JSON] PoolConfigRequest :> Patch '[JSON] (Response Value)
       :<|> "1.0" :> "storage-pools" :> Capture "name" PoolName :> Delete '[JSON] (Response Value)
+      :<|> "1.0" :> "storage-pools" :> Capture "pool" PoolName :> "volumes" :> Get '[JSON] (Response [VolumeName])
+      :<|> "1.0" :> "storage-pools" :> Capture "pool" PoolName :> "volumes" :> ReqBody '[JSON] VolumeCreateRequest :> Post '[JSON] (Response Value)
+      :<|> "1.0" :> "storage-pools" :> Capture "pool" PoolName :> "volumes" :> Capture "type" VolumeType :> Capture "volume" VolumeName :> Get '[JSON] (Response Volume)
+      :<|> "1.0" :> "storage-pools" :> Capture "pool" PoolName :> "volumes" :> Capture "type" VolumeType :> Capture "volume" VolumeName :> ReqBody '[JSON] VolumeConfigRequest :> Put '[JSON] (Response Value)
+      :<|> "1.0" :> "storage-pools" :> Capture "pool" PoolName :> "volumes" :> Capture "type" VolumeType :> Capture "volume" VolumeName :> ReqBody '[JSON] VolumeConfigRequest :> Patch '[JSON] (Response Value)
+      :<|> "1.0" :> "storage-pools" :> Capture "pool" PoolName :> "volumes" :> Capture "type" VolumeType :> Capture "volume" VolumeName :> Delete '[JSON] (Response Value)
       :<|> "1.0" :> "operations" :> Get '[JSON] (Response AllOperations)
       :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Get '[JSON] (Response Operation)
       :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Delete '[JSON] (Response Value)
@@ -196,6 +210,12 @@ pool                                 :: PoolName -> ClientM (Response Pool)
 poolPut                              :: PoolName -> PoolConfigRequest -> ClientM (Response Value)
 poolPatch                            :: PoolName -> PoolConfigRequest -> ClientM (Response Value)
 poolDelete                           :: PoolName -> ClientM (Response Value)
+volumeList                           :: PoolName -> ClientM (Response [VolumeName])
+volumeCreate                         :: PoolName -> VolumeCreateRequest -> ClientM (Response Value)
+volume'                              :: PoolName -> VolumeType -> VolumeName -> ClientM (Response Volume)
+volumePut'                           :: PoolName -> VolumeType -> VolumeName -> VolumeConfigRequest -> ClientM (Response Value)
+volumePatch'                         :: PoolName -> VolumeType -> VolumeName -> VolumeConfigRequest -> ClientM (Response Value)
+volumeDelete'                        :: PoolName -> VolumeType -> VolumeName -> ClientM (Response Value)
 operationIds                         :: ClientM (Response AllOperations)
 operation                            :: OperationId -> ClientM (Response Operation)
 operationCancel                      :: OperationId -> ClientM (Response Value)
@@ -240,11 +260,29 @@ supportedVersions                        :<|>
     poolPut                              :<|>
     poolPatch                            :<|>
     poolDelete                           :<|>
+    volumeList                           :<|>
+    volumeCreate                         :<|>
+    volume'                              :<|>
+    volumePut'                           :<|>
+    volumePatch'                         :<|>
+    volumeDelete'                        :<|>
     operationIds                         :<|>
     operation                            :<|>
     operationCancel                      :<|>
     operationWait
     = client api
+
+volume :: PoolName -> VolumeName -> ClientM (Response Volume)
+volume p v@(VolumeName t _) = volume' p t v
+
+volumePut :: PoolName -> VolumeName -> VolumeConfigRequest -> ClientM (Response Value)
+volumePut p v@(VolumeName t _) = volumePut' p t v
+
+volumePatch :: PoolName -> VolumeName -> VolumeConfigRequest -> ClientM (Response Value)
+volumePatch p v@(VolumeName t _) = volumePatch' p t v
+
+volumeDelete :: PoolName -> VolumeName -> ClientM (Response Value)
+volumeDelete p v@(VolumeName t _) = volumeDelete' p t v
 
 containerGetPath :: ContainerName -> FilePath -> ClientM PathResponse
 containerGetPath name fp = do

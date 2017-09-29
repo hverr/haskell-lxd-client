@@ -115,6 +115,13 @@ module Network.LXD.Client.Types (
 , PoolCreateRequest(..)
 , PoolConfigRequest(..)
 
+  -- * Volumes
+, VolumeType
+, VolumeName(..)
+, Volume(..)
+, VolumeCreateRequest(..)
+, VolumeConfigRequest(..)
+
   -- * Operations
 , OperationId(..)
 , OperationStatus
@@ -1168,6 +1175,77 @@ newtype PoolConfigRequest = PoolConfigRequest {
 instance ToJSON PoolConfigRequest where
     toJSON PoolConfigRequest{..} = object [ "config" .= poolConfigRequestConfig ]
 
+
+-- | Type of a volume.
+type VolumeType = String
+
+-- | LXD volume name, and its type.
+--
+-- Returned by @GET \/1.0\/storage-pools\/\<name\>\/volumes@.
+data VolumeName = VolumeName VolumeType String
+
+instance FromJSON VolumeName where
+    parseJSON = withText "VolumeName" $ \text ->
+        case reverse $ splitOn' '/' (unpack text) of
+            n:t:_ -> return $ VolumeName (toType t) n
+            _     -> fail $ "could not parse voluem name: " ++ show text
+      where
+        splitOn' _ [] = []
+        splitOn' s xs = case span (/= s) xs of
+            (y, []) -> if last y == s then [y, []] else [y]
+            (y, ys) -> y:splitOn' s ys
+
+        toType "containers" = "container"
+        toType t            = t
+
+instance ToHttpApiData VolumeName where
+    toUrlPiece (VolumeName _ name) = pack name
+
+-- | LXD volume.
+--
+-- Returend by @GET \/1.0\/storage-pools\/\<name\>\/volumes\/\<type\>\/\<volume\>@.
+data Volume = Volume {
+    volumeName :: String
+  , volumeType :: String
+  , volumeConfig :: Map String String
+  , volumeUsedBy :: [ContainerName]
+} deriving (Show)
+
+instance FromJSON Volume where
+    parseJSON = withObject "Volume" $ \v -> do
+        volumeName   <- v .: "name"
+        volumeType   <- v .: "type"
+        volumeConfig <- v .: "config"
+        volumeUsedBy <- v .: "used_by"
+        return Volume{..}
+
+-- | LXD volume create request.
+--
+-- Used when querying @POST \/1.0\/storage-pools\/\<name\>\/volumes@.
+data VolumeCreateRequest = VolumeCreateRequest {
+    volumeCreateRequestConfig :: Map String String
+  , volumeCreateRequestPool :: String
+  , volumeCreateRequestName :: String
+  , volumeCreateRequestType :: String
+} deriving (Show)
+
+instance ToJSON VolumeCreateRequest where
+    toJSON VolumeCreateRequest{..} = object [
+        "config" .= volumeCreateRequestConfig
+      , "pool"   .= volumeCreateRequestPool
+      , "name"   .= volumeCreateRequestName
+      , "type"   .= volumeCreateRequestType
+      ]
+
+-- | LXD volume config request.
+--
+-- Returend by @PUT/PATCH \/1.0\/storage-pools\/\<name\>\/volumes\/\<type\>\/\<volume\>@.
+newtype VolumeConfigRequest = VolumeConfigRequest {
+    volumeConfigRequestConfig :: Map String String
+} deriving (Show)
+
+instance ToJSON VolumeConfigRequest where
+    toJSON VolumeConfigRequest{..} = object [ "config" .= volumeConfigRequestConfig ]
 
 -- | LXD operation identifier.
 newtype OperationId = OperationId String deriving (Eq, Show)
