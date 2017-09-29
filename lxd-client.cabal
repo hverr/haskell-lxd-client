@@ -1,8 +1,8 @@
 name:                lxd-client
 version:             0.1.0.0
-synopsis:            LXD REST API Client for Haskell
+synopsis:            LXD client written in Haskell.
 description:
-    Implementation of a REST API client of LXD in Haskell.
+    Implementation of the LXD client protocol in Haskell.
 homepage:            https://github.com/hverr/haskell-lxd-client#readme
 license:             GPL-3
 license-file:        LICENSE
