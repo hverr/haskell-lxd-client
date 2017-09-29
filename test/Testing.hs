@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Testing where
 
-import Network.LXD.Prelude
+import Network.LXD.Client.Internal.Prelude
 
 newtype Tester m a = Tester { runTester :: StateT [(String, Test m String)] m a }
                    deriving (Functor, Applicative, Monad, MonadIO, MonadState [(String, Test m String)])

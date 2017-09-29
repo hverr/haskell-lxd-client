@@ -88,7 +88,7 @@ module Network.LXD.Client.Commands (
 , lxcVolumeDelete
 ) where
 
-import Network.LXD.Prelude
+import Network.LXD.Client.Internal.Prelude
 
 import Control.Concurrent.Async (Async, async, withAsync, wait, uninterruptibleCancel)
 import Control.Concurrent.MVar

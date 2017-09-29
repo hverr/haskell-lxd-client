@@ -1,4 +1,5 @@
-module Network.LXD.Prelude (
+-- | Internal prelude.
+module Network.LXD.Client.Internal.Prelude (
   -- * Re-exports
   module Prelude
 

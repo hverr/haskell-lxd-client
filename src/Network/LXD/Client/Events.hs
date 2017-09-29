@@ -1,6 +1,6 @@
 module Network.LXD.Client.Events where
 
-import Network.LXD.Prelude
+import Network.LXD.Client.Internal.Prelude
 
 import Control.Concurrent.MVar (MVar, putMVar, takeMVar)
 import Control.Exception (Exception, catch, throwIO, finally)

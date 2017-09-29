@@ -22,7 +22,7 @@ module Network.LXD.Client (
 , runWebSocketsLocal
 ) where
 
-import Network.LXD.Prelude
+import Network.LXD.Client.Internal.Prelude
 
 import Control.Exception (SomeException, tryJust, toException, throwIO, bracket)
 

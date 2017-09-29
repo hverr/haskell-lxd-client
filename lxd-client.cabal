@@ -19,9 +19,9 @@ library
                      , Network.LXD.Client.API
                      , Network.LXD.Client.Commands
                      , Network.LXD.Client.Events
+                     , Network.LXD.Client.Internal.Prelude
                      , Network.LXD.Client.Remotes
                      , Network.LXD.Client.Types
-                     , Network.LXD.Prelude
   build-depends:       base >= 4.7 && < 5
                      , aeson
                      , async

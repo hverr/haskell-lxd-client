@@ -1,6 +1,6 @@
 module Main where
 
-import Network.LXD.Prelude hiding (log)
+import Network.LXD.Client.Internal.Prelude hiding (log)
 
 import Control.Monad.Catch (bracket, bracket_)
 import Control.Concurrent (threadDelay)

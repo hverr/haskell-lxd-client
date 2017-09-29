@@ -89,7 +89,7 @@ module Network.LXD.Client.API (
 , ExecClient
 ) where
 
-import Network.LXD.Prelude
+import Network.LXD.Client.Internal.Prelude
 
 import Control.Concurrent (MVar, takeMVar)
 import Control.Exception (Exception, catch, throwIO)

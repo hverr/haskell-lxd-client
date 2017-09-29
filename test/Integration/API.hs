@@ -3,7 +3,7 @@
 {-# LANGUAGE RecordWildCards #-}
 module Integration.API where
 
-import Network.LXD.Prelude
+import Network.LXD.Client.Internal.Prelude
 import Testing
 
 import Control.Concurrent (newEmptyMVar, newMVar, putMVar, takeMVar, modifyMVar_)

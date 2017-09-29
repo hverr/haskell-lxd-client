@@ -5,7 +5,7 @@
 -- Run @lxc image list@ for more information.
 module Network.LXD.Client.Remotes where
 
-import Network.LXD.Prelude
+import Network.LXD.Client.Internal.Prelude
 
 imagesRemote :: String
 imagesRemote = "https://images.linuxcontainers.org"

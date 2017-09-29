@@ -138,7 +138,7 @@ module Network.LXD.Client.Types (
 , JsonOrBinary
 ) where
 
-import Network.LXD.Prelude
+import Network.LXD.Client.Internal.Prelude
 import qualified Prelude as P
 
 import Data.Aeson
