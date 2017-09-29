@@ -5,6 +5,8 @@
 -- | This module implements commands to communicate with the LXD daemon
 -- over its REST API.
 --
+-- More information about LXD: <https://github.com/lxc/lxd>
+--
 -- This module implements a high-level interface, and is probably what
 -- you need. It uses the lower-level interface implemented in
 -- "Network.LXD.Client.API", but unless you are a power user, you
