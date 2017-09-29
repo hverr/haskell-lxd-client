@@ -64,6 +64,13 @@ module Network.LXD.Client.Commands (
 , lxcImageAlias
 , lxcImageCreate
 , lxcImageDelete
+
+  -- * Networks
+, lxcNetworkList
+, lxcNetworkCreate
+, lxcNetworkInfo
+, lxcNetworkConfig
+, lxcNetworkDelete
 ) where
 
 import Network.LXD.Prelude
@@ -496,6 +503,26 @@ lxcImageCreate req = runAndWait $ imageCreate req >>= checkResponseCreated
 -- | Delete an image.
 lxcImageDelete :: HasClient m => ImageId -> m ()
 lxcImageDelete img = runAndWait $ imageDelete img def >>= checkResponseCreated
+
+-- | List all networks
+lxcNetworkList :: HasClient m => m [NetworkName]
+lxcNetworkList = runClient $ networkList >>= checkResponseOK
+
+-- | Create a network.
+lxcNetworkCreate :: HasClient m => NetworkCreateRequest -> m ()
+lxcNetworkCreate n = void . runClient $ networkCreate n >>= checkResponseOK
+
+-- | Get network information.
+lxcNetworkInfo :: HasClient m => NetworkName -> m Network
+lxcNetworkInfo n = runClient $ network n >>= checkResponseOK
+
+-- | Configure a network.
+lxcNetworkConfig :: HasClient m => NetworkName -> NetworkConfigRequest -> m ()
+lxcNetworkConfig n c = void . runClient $ networkPatch n c >>= checkResponseOK
+
+-- | Delete a network
+lxcNetworkDelete :: HasClient m => NetworkName -> m ()
+lxcNetworkDelete n = void . runClient $ networkDelete n >>= checkResponseOK
 
 -- | Run a client operation.
 runClient :: HasClient m => ClientM a -> m a
