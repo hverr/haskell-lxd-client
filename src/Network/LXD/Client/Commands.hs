@@ -85,6 +85,13 @@ module Network.LXD.Client.Commands (
 , lxcStorageInfo
 , lxcStorageConfig
 , lxcStorageDelete
+
+  -- * Volume
+, lxcVolumeList
+, lxcVolumeCreate
+, lxcVolumeInfo
+, lxcVolumeConfig
+, lxcVolumeDelete
 ) where
 
 import Network.LXD.Prelude
@@ -562,21 +569,41 @@ lxcProfileDelete n = void . runClient $ profileDelete n >>= checkResponseOK
 lxcStorageList :: HasClient m => m [PoolName]
 lxcStorageList = runClient $ poolList >>= checkResponseOK
 
--- | Create a profile.
+-- | Create a storage pool.
 lxcStorageCreate :: HasClient m => PoolCreateRequest -> m ()
 lxcStorageCreate n = void . runClient $ poolCreate n >>= checkResponseOK
 
--- | Get profile information.
+-- | Get storage pool information.
 lxcStorageInfo :: HasClient m => PoolName -> m Pool
 lxcStorageInfo n = runClient $ pool n >>= checkResponseOK
 
--- | Configure a profile.
+-- | Configure a storage pool.
 lxcStorageConfig :: HasClient m => PoolName -> PoolConfigRequest -> m ()
 lxcStorageConfig n c = void . runClient $ poolPatch n c >>= checkResponseOK
 
--- | Delete a profile
+-- | Delete a storage pool
 lxcStorageDelete :: HasClient m => PoolName -> m ()
 lxcStorageDelete n = void . runClient $ poolDelete n >>= checkResponseOK
+
+-- | List all volumes
+lxcVolumeList :: HasClient m => PoolName -> m [VolumeName]
+lxcVolumeList p = runClient $ volumeList p >>= checkResponseOK
+
+-- | Create a volume.
+lxcVolumeCreate :: HasClient m => PoolName -> VolumeCreateRequest -> m ()
+lxcVolumeCreate p r = void . runClient $ volumeCreate p r >>= checkResponseOK
+
+-- | Get volume information.
+lxcVolumeInfo :: HasClient m => PoolName -> VolumeName -> m Volume
+lxcVolumeInfo p n = runClient $ volume p n >>= checkResponseOK
+
+-- | Configure a volume.
+lxcVolumeConfig :: HasClient m => PoolName -> VolumeName -> VolumeConfigRequest -> m ()
+lxcVolumeConfig p n c = void . runClient $ volumePatch p n c >>= checkResponseOK
+
+-- | Delete a volume
+lxcVolumeDelete :: HasClient m => PoolName -> VolumeName -> m ()
+lxcVolumeDelete p n = void . runClient $ volumeDelete p n >>= checkResponseOK
 
 -- | Run a client operation.
 runClient :: HasClient m => ClientM a -> m a
