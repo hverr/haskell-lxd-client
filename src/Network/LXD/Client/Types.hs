@@ -103,6 +103,12 @@ module Network.LXD.Client.Types (
 , NetworkCreateRequest(..)
 , NetworkConfigRequest(..)
 
+  -- * Profiles
+, ProfileName(..)
+, Profile(..)
+, ProfileCreateRequest(..)
+, ProfileConfigRequest(..)
+
   -- * Operations
 , OperationId(..)
 , OperationStatus
@@ -1019,6 +1025,77 @@ newtype NetworkConfigRequest = NetworkConfigRequest {
 instance ToJSON NetworkConfigRequest where
     toJSON NetworkConfigRequest{..} = object [ "config" .= networkConfigRequestConfig ]
 
+-- | LXD profile name.
+--
+-- Returned by @GET \/1.0\/profiles@.
+newtype ProfileName = ProfileName String deriving (Eq, Show)
+
+instance FromJSON ProfileName where
+    parseJSON = withText "ProfileName" $ \text ->
+        let prefix = "/1.0/profiles/" in
+        case stripPrefix prefix (unpack text) of
+            Nothing -> fail $ "could not parse profile name: no prefix " ++ prefix
+            Just operation -> return $ ProfileName operation
+
+instance IsString ProfileName where
+    fromString = ProfileName
+
+instance ToHttpApiData ProfileName where
+    toUrlPiece (ProfileName name) = pack name
+
+-- | LXD profile.
+--
+-- Returned by @GET \/1.0\/profiles\/\<name\>@.
+data Profile = Profile {
+    profileName :: String
+  , profileDescription :: String
+  , profileConfig :: Map String String
+  , profileDevices :: Map String (Map String String)
+  , profileUsedBy :: [ContainerName]
+} deriving (Show)
+
+instance FromJSON Profile where
+    parseJSON = withObject "Profile" $ \v -> do
+        profileName        <- v .: "name"
+        profileDescription <- v .: "description"
+        profileConfig      <- v .: "config"
+        profileDevices     <- v .: "devices"
+        profileUsedBy      <- v .: "use_by"
+        return Profile{..}
+
+-- | LXD profile create request.
+--
+-- Used when querying @POST \/1.0\/profiles@.
+data ProfileCreateRequest = ProfileCreateRequest {
+    profileCreateRequestName :: String
+  , profileCreateRequestDescription :: String
+  , profileCreateRequestConfig :: Map String String
+  , profileCreateRequestDevices :: Map String (Map String String)
+} deriving (Show)
+
+instance ToJSON ProfileCreateRequest where
+    toJSON ProfileCreateRequest{..} = object [
+        "name"        .= profileCreateRequestName
+      , "description" .= profileCreateRequestDescription
+      , "config"      .= profileCreateRequestConfig
+      , "devices"     .= profileCreateRequestDevices
+      ]
+
+-- | LXD profile config request.
+--
+-- Used when querying @PUT/PATCH \/1.0\/profiles\/\<name\>@.
+data ProfileConfigRequest = ProfileConfigRequest {
+    profileConfigRequestConfig :: Maybe (Map String String)
+  , profileConfigRequestDescription :: Maybe String
+  , profileConfigRequestDevices :: Maybe (Map String (Map String String))
+} deriving (Show)
+
+instance ToJSON ProfileConfigRequest where
+    toJSON ProfileConfigRequest{..} = object $ catMaybes [
+        (.=) <$> pure "config"      <*> profileConfigRequestConfig
+      , (.=) <$> pure "description" <*> profileConfigRequestDescription
+      , (.=) <$> pure "devices"     <*> profileConfigRequestDevices
+      ]
 -- | LXD operation identifier.
 newtype OperationId = OperationId String deriving (Eq, Show)
 

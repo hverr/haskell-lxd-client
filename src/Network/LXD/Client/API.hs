@@ -50,6 +50,14 @@ module Network.LXD.Client.API (
 , networkPatch
 , networkDelete
 
+  -- ** Profiles
+, profileList
+, profileCreate
+, profile
+, profilePut
+, profilePatch
+, profileDelete
+
   -- ** Operations
 , operationIds
 , operation
@@ -120,6 +128,12 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> "1.0" :> "networks" :> Capture "name" NetworkName :> ReqBody '[JSON] NetworkConfigRequest :> Put '[JSON] (Response Value)
       :<|> "1.0" :> "networks" :> Capture "name" NetworkName :> ReqBody '[JSON] NetworkConfigRequest :> Patch '[JSON] (Response Value)
       :<|> "1.0" :> "networks" :> Capture "name" NetworkName :> Delete '[JSON] (Response Value)
+      :<|> "1.0" :> "profiles" :> Get '[JSON] (Response [ProfileName])
+      :<|> "1.0" :> "profiles" :> ReqBody '[JSON] ProfileCreateRequest :> Post '[JSON] (Response Value)
+      :<|> "1.0" :> "profiles" :> Capture "name" ProfileName :> Get '[JSON] (Response Profile)
+      :<|> "1.0" :> "profiles" :> Capture "name" ProfileName :> ReqBody '[JSON] ProfileConfigRequest :> Put '[JSON] (Response Value)
+      :<|> "1.0" :> "profiles" :> Capture "name" ProfileName :> ReqBody '[JSON] ProfileConfigRequest :> Patch '[JSON] (Response Value)
+      :<|> "1.0" :> "profiles" :> Capture "name" ProfileName :> Delete '[JSON] (Response Value)
       :<|> "1.0" :> "operations" :> Get '[JSON] (Response AllOperations)
       :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Get '[JSON] (Response Operation)
       :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Delete '[JSON] (Response Value)
@@ -156,6 +170,12 @@ network                              :: NetworkName -> ClientM (Response Network
 networkPut                           :: NetworkName -> NetworkConfigRequest -> ClientM (Response Value)
 networkPatch                         :: NetworkName -> NetworkConfigRequest -> ClientM (Response Value)
 networkDelete                        :: NetworkName -> ClientM (Response Value)
+profileList                          :: ClientM (Response [ProfileName])
+profileCreate                        :: ProfileCreateRequest -> ClientM (Response Value)
+profile                              :: ProfileName -> ClientM (Response Profile)
+profilePut                           :: ProfileName -> ProfileConfigRequest -> ClientM (Response Value)
+profilePatch                         :: ProfileName -> ProfileConfigRequest -> ClientM (Response Value)
+profileDelete                        :: ProfileName -> ClientM (Response Value)
 operationIds                         :: ClientM (Response AllOperations)
 operation                            :: OperationId -> ClientM (Response Operation)
 operationCancel                      :: OperationId -> ClientM (Response Value)
@@ -182,12 +202,18 @@ supportedVersions                        :<|>
     imageAlias                           :<|>
     image                                :<|>
     imageDelete                          :<|>
-    networkList                           :<|>
-    networkCreate                         :<|>
-    network                               :<|>
-    networkPut                            :<|>
-    networkPatch                          :<|>
-    networkDelete                         :<|>
+    networkList                          :<|>
+    networkCreate                        :<|>
+    network                              :<|>
+    networkPut                           :<|>
+    networkPatch                         :<|>
+    networkDelete                        :<|>
+    profileList                          :<|>
+    profileCreate                        :<|>
+    profile                              :<|>
+    profilePut                           :<|>
+    profilePatch                         :<|>
+    profileDelete                        :<|>
     operationIds                         :<|>
     operation                            :<|>
     operationCancel                      :<|>
