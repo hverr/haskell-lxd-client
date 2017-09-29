@@ -2,6 +2,27 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
+-- | This module implements commands to communicate with the LXD daemon
+-- over its REST API.
+--
+-- This module implements a high-level interface, and is probably what
+-- you need. It uses the lower-level interface implemented in
+-- "Network.LXD.Client.API", but unless you are a power user, you
+-- shouldn't need this module.
+--
+-- All commands take place in the 'HasClient' monad. The 'WithLocalHost'
+-- and 'WithRemoteHost' monads can be used directly for fast access to
+-- an LXD daemon, but you can also make your own monad stack an instance
+-- of 'HasClient'.
+--
+-- You can connect to an LXD daemon over a unix-socket on the local
+-- host, or over HTTPS. For more information about these connection
+-- types see "Network.LXD.Client".
+--
+-- An example using these command to conncet to the LXD instance on your
+-- local host (should work out of the box).
+--
+-- @TODO@.
 module Network.LXD.Client.Commands (
   -- * Re-exports
   def
@@ -9,6 +30,7 @@ module Network.LXD.Client.Commands (
 , module Network.LXD.Client.Types
 
   -- * Running commands
+, Host(..)
 , HasClient(..)
 , defaultClientEnv
 , WithLocalHost, runWithLocalHost
@@ -112,7 +134,8 @@ import System.FilePath ((</>), splitPath)
 import System.Posix.Files (getFileStatus, fileMode, setFileMode)
 import qualified System.IO as IO
 
-import Network.LXD.Client
+import Network.LXD.Client hiding (Host)
+import Network.LXD.Client.API
 import Network.LXD.Client.Types
 import Network.LXD.Client.Events
 import Network.LXD.Client.Remotes

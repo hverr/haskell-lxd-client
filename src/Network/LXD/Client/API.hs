@@ -3,6 +3,13 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TypeOperators #-}
+-- | This module exposes a low-level Servant-built API for the LXD daemon.
+--
+-- You can query this API using Servant functions and a client created
+-- from "Network.LXD.Client".
+--
+-- You probably want to use the commands exposed in
+-- "Network.LXD.Client.Commands" instead.
 module Network.LXD.Client.API (
   -- * API
   FailureResponse(..)

@@ -1,3 +1,5 @@
+-- | This module implements high-level client for the LXD daemon events
+-- end-points.
 module Network.LXD.Client.Events where
 
 import Network.LXD.Client.Internal.Prelude

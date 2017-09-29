@@ -10,6 +10,11 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+-- | This module implements all types used to communicate with the LXD
+-- daemon REST end-point.
+--
+-- These types are e.g. used in the "Network.LXD.Client.Commands"
+-- module.
 module Network.LXD.Client.Types (
   -- * Generic responses
   GenericResponse(..)

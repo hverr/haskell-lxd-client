@@ -1,14 +1,29 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
+-- | This module exposes functionality to create LXD clients. These can
+-- be used to communciate to an LXD daemon, either using the high-level
+-- "Network.LXD.Client.Commands" module, or the low-level
+-- "Network.LXD.Client.API" module.
+--
+-- __You are probably looking for "Network.LXD.Client.Commands"__, which
+-- exposes a high-level interface to communicate with the LXD daemon.
+--
+-- If you are simply connecting to the LXD daemon on your local host,
+-- you shouldn't import this module. The "Network.LXD.Client.Commands"
+-- module probably re-exports enough functionality for your needs.
+--
+--
 module Network.LXD.Client (
-  module Network.LXD.Client.API
-, module Network.LXD.Client.Types
+  module Network.LXD.Client.Types
 
   -- * LXD Host Management
   -- ** HTTPS Clients
+  -- *** Types
 , RemoteHost(..)
 , ClientAuth(..)
 , ServerAuth(..)
+, Host, RemoteName, Certificate, Key, PrivateKey(..)
+  -- *** Functions
 , remoteHostClient
 , remoteHostManager
 , clientManager
@@ -36,7 +51,6 @@ import Data.X509.Validation (ValidationCache,
 import Data.X509.CertificateStore (CertificateStore, readCertificateStore)
 import qualified Data.ByteString.Lazy as B
 
-import Network.LXD.Client.API
 import Network.LXD.Client.Types
 
 import Network.Connection (ConnectionParams(..), TLSSettings(..), initConnectionContext)
