@@ -42,6 +42,14 @@ module Network.LXD.Client.API (
 , image
 , imageDelete
 
+  -- ** Networks
+, networkList
+, networkCreate
+, network
+, networkPut
+, networkPatch
+, networkDelete
+
   -- ** Operations
 , operationIds
 , operation
@@ -106,6 +114,12 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> "1.0" :> "images" :> "aliases" :> Capture "name" ImageAliasName :> Get '[JSON] (Response ImageAlias)
       :<|> "1.0" :> "images" :> Capture "id" ImageId :> Get '[JSON] (Response Image)
       :<|> "1.0" :> "images" :> Capture "id" ImageId :> ReqBody '[JSON] ImageDeleteRequest :> Delete '[JSON] (AsyncResponse Value)
+      :<|> "1.0" :> "networks" :> Get '[JSON] (Response [NetworkName])
+      :<|> "1.0" :> "networks" :> ReqBody '[JSON] NetworkCreateRequest :> Post '[JSON] (Response Value)
+      :<|> "1.0" :> "networks" :> Capture "name" NetworkName :> Get '[JSON] (Response Network)
+      :<|> "1.0" :> "networks" :> Capture "name" NetworkName :> ReqBody '[JSON] NetworkConfigRequest :> Put '[JSON] (Response Value)
+      :<|> "1.0" :> "networks" :> Capture "name" NetworkName :> ReqBody '[JSON] NetworkConfigRequest :> Patch '[JSON] (Response Value)
+      :<|> "1.0" :> "networks" :> Capture "name" NetworkName :> Delete '[JSON] (Response Value)
       :<|> "1.0" :> "operations" :> Get '[JSON] (Response AllOperations)
       :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Get '[JSON] (Response Operation)
       :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Delete '[JSON] (Response Value)
@@ -136,6 +150,12 @@ imageAliases                         :: ClientM (Response [ImageAliasName])
 imageAlias                           :: ImageAliasName -> ClientM (Response ImageAlias)
 image                                :: ImageId -> ClientM (Response Image)
 imageDelete                          :: ImageId -> ImageDeleteRequest -> ClientM (AsyncResponse Value)
+networkList                          :: ClientM (Response [NetworkName])
+networkCreate                        :: NetworkCreateRequest -> ClientM (Response Value)
+network                              :: NetworkName -> ClientM (Response Network)
+networkPut                           :: NetworkName -> NetworkConfigRequest -> ClientM (Response Value)
+networkPatch                         :: NetworkName -> NetworkConfigRequest -> ClientM (Response Value)
+networkDelete                        :: NetworkName -> ClientM (Response Value)
 operationIds                         :: ClientM (Response AllOperations)
 operation                            :: OperationId -> ClientM (Response Operation)
 operationCancel                      :: OperationId -> ClientM (Response Value)
@@ -162,6 +182,12 @@ supportedVersions                        :<|>
     imageAlias                           :<|>
     image                                :<|>
     imageDelete                          :<|>
+    networkList                           :<|>
+    networkCreate                         :<|>
+    network                               :<|>
+    networkPut                            :<|>
+    networkPatch                          :<|>
+    networkDelete                         :<|>
     operationIds                         :<|>
     operation                            :<|>
     operationCancel                      :<|>

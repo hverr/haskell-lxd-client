@@ -97,6 +97,12 @@ module Network.LXD.Client.Types (
 , remoteImage
 , remoteImageId
 
+  -- * Networks
+, NetworkName(..)
+, Network(..)
+, NetworkCreateRequest(..)
+, NetworkConfigRequest(..)
+
   -- * Operations
 , OperationId(..)
 , OperationStatus
@@ -947,6 +953,71 @@ instance Default ImageDeleteRequest where
 
 instance ToJSON ImageDeleteRequest where
     toJSON _ = object []
+
+-- | LXD network name.
+newtype NetworkName = NetworkName String deriving (Eq, Show)
+
+instance FromJSON NetworkName where
+    parseJSON = withText "NetworkName" $ \text ->
+        let prefix = "/1.0/networks/" in
+        case stripPrefix prefix (unpack text) of
+            Nothing -> fail $ "could not parse netwokr name: no prefix " ++ prefix
+            Just name -> return $ NetworkName name
+
+instance ToJSON NetworkName where
+    toJSON (NetworkName name) = toJSON name
+
+instance IsString NetworkName where
+    fromString = NetworkName
+
+instance ToHttpApiData NetworkName where
+    toUrlPiece (NetworkName name) = pack name
+
+-- | LXD network.
+--
+-- Returned when querying @GET \/1.0\/networks\/\<name\>@.
+data Network = Network {
+    networkName :: String
+  , networkConfig :: Map String String
+  , networkManaged :: Bool
+  , networkType :: String
+  , networkUsedBy :: [ContainerName]
+} deriving (Show)
+
+instance FromJSON Network where
+    parseJSON = withObject "Network" $ \v -> do
+        networkName    <- v .: "name"
+        networkConfig  <- v .: "config"
+        networkManaged <- v .: "managed"
+        networkType    <- v .: "type"
+        networkUsedBy  <- v .: "used_by"
+        return Network{..}
+
+-- | LXD network create request.
+--
+-- Used when querying @POST \/1.0\/networks@.
+data NetworkCreateRequest = NetworkCreateRequest {
+    networkCreateRequestName :: NetworkName
+  , networkCreateRequestDescription :: String
+  , networkCreateRequestConfig :: Map String String
+} deriving (Show)
+
+instance ToJSON NetworkCreateRequest where
+    toJSON NetworkCreateRequest{..} = object [
+        "name"        .= networkCreateRequestName
+      , "description" .= networkCreateRequestDescription
+      , "config"      .= networkCreateRequestConfig
+      ]
+
+-- | LXD network config update request.
+--
+-- Used when querying @PUT/PATCH \/1.0\/networks\/\<name\>@.
+newtype NetworkConfigRequest = NetworkConfigRequest {
+    networkConfigRequestConfig :: Map String String
+} deriving (Show)
+
+instance ToJSON NetworkConfigRequest where
+    toJSON NetworkConfigRequest{..} = object [ "config" .= networkConfigRequestConfig ]
 
 -- | LXD operation identifier.
 newtype OperationId = OperationId String deriving (Eq, Show)
