@@ -78,6 +78,13 @@ module Network.LXD.Client.Commands (
 , lxcProfileInfo
 , lxcProfileConfig
 , lxcProfileDelete
+
+  -- * Storage
+, lxcStorageList
+, lxcStorageCreate
+, lxcStorageInfo
+, lxcStorageConfig
+, lxcStorageDelete
 ) where
 
 import Network.LXD.Prelude
@@ -550,6 +557,26 @@ lxcProfileConfig n c = void . runClient $ profilePatch n c >>= checkResponseOK
 -- | Delete a profile
 lxcProfileDelete :: HasClient m => ProfileName -> m ()
 lxcProfileDelete n = void . runClient $ profileDelete n >>= checkResponseOK
+
+-- | List all storage pools
+lxcStorageList :: HasClient m => m [PoolName]
+lxcStorageList = runClient $ poolList >>= checkResponseOK
+
+-- | Create a profile.
+lxcStorageCreate :: HasClient m => PoolCreateRequest -> m ()
+lxcStorageCreate n = void . runClient $ poolCreate n >>= checkResponseOK
+
+-- | Get profile information.
+lxcStorageInfo :: HasClient m => PoolName -> m Pool
+lxcStorageInfo n = runClient $ pool n >>= checkResponseOK
+
+-- | Configure a profile.
+lxcStorageConfig :: HasClient m => PoolName -> PoolConfigRequest -> m ()
+lxcStorageConfig n c = void . runClient $ poolPatch n c >>= checkResponseOK
+
+-- | Delete a profile
+lxcStorageDelete :: HasClient m => PoolName -> m ()
+lxcStorageDelete n = void . runClient $ poolDelete n >>= checkResponseOK
 
 -- | Run a client operation.
 runClient :: HasClient m => ClientM a -> m a
