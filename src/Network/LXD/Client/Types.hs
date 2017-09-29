@@ -109,6 +109,12 @@ module Network.LXD.Client.Types (
 , ProfileCreateRequest(..)
 , ProfileConfigRequest(..)
 
+  -- * Storage
+, PoolName(..)
+, Pool(..)
+, PoolCreateRequest(..)
+, PoolConfigRequest(..)
+
   -- * Operations
 , OperationId(..)
 , OperationStatus
@@ -1096,6 +1102,73 @@ instance ToJSON ProfileConfigRequest where
       , (.=) <$> pure "description" <*> profileConfigRequestDescription
       , (.=) <$> pure "devices"     <*> profileConfigRequestDevices
       ]
+
+-- | LXD storage pool name.
+--
+-- Returned by @GET \/1.0\/storage-pools@.
+newtype PoolName = PoolName String deriving (Eq, Show)
+
+instance FromJSON PoolName where
+    parseJSON = withText "PoolName" $ \text ->
+        let prefix = "/1.0/storage-pools/" in
+        case stripPrefix prefix (unpack text) of
+            Nothing -> fail $ "could not parse storage pool name: no prefix " ++ prefix
+            Just operation -> return $ PoolName operation
+
+instance IsString PoolName where
+    fromString = PoolName
+
+instance ToHttpApiData PoolName where
+    toUrlPiece (PoolName name) = pack name
+
+
+-- | LXD pool.
+--
+-- Returned by @GET \/1.0\/storage-pools\/\<name\>@.
+data Pool = Pool {
+    poolName :: String
+  , poolDescription :: String
+  , poolDriver :: String
+  , poolConfig :: Map String String
+  , poolUsedBy :: [ContainerName]
+} deriving (Show)
+
+instance FromJSON Pool where
+    parseJSON = withObject "Pool" $ \v -> do
+        poolName        <- v .: "name"
+        poolDescription <- v .: "description"
+        poolDriver      <- v .: "driver"
+        poolConfig      <- v .: "config"
+        poolUsedBy      <- v .: "used_by"
+        return Pool{..}
+
+-- | LXD pool create request.
+--
+-- Used when querying @POST \/1.0\/storage-pools@.
+data PoolCreateRequest = PoolCreateRequest {
+    poolCreateRequestName :: String
+  , poolCreateRequestDriver :: String
+  , poolCreateRequestConfig :: Map String String
+} deriving (Show)
+
+instance ToJSON PoolCreateRequest where
+    toJSON PoolCreateRequest{..} = object [
+        "name"   .= poolCreateRequestName
+      , "driver" .= poolCreateRequestDriver
+      , "config" .= poolCreateRequestConfig
+      ]
+
+-- | LXD pool config request.
+--
+-- Used when querying @PUT/PATCH \/1.0\/storage-pools\/\<name\>@.
+newtype PoolConfigRequest = PoolConfigRequest {
+    poolConfigRequestConfig :: Map String String
+} deriving (Show)
+
+instance ToJSON PoolConfigRequest where
+    toJSON PoolConfigRequest{..} = object [ "config" .= poolConfigRequestConfig ]
+
+
 -- | LXD operation identifier.
 newtype OperationId = OperationId String deriving (Eq, Show)
 

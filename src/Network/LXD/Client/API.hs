@@ -58,6 +58,14 @@ module Network.LXD.Client.API (
 , profilePatch
 , profileDelete
 
+  -- ** Storage
+, poolList
+, poolCreate
+, pool
+, poolPut
+, poolPatch
+, poolDelete
+
   -- ** Operations
 , operationIds
 , operation
@@ -134,6 +142,12 @@ type API = Get '[JSON] (Response [ApiVersion])
       :<|> "1.0" :> "profiles" :> Capture "name" ProfileName :> ReqBody '[JSON] ProfileConfigRequest :> Put '[JSON] (Response Value)
       :<|> "1.0" :> "profiles" :> Capture "name" ProfileName :> ReqBody '[JSON] ProfileConfigRequest :> Patch '[JSON] (Response Value)
       :<|> "1.0" :> "profiles" :> Capture "name" ProfileName :> Delete '[JSON] (Response Value)
+      :<|> "1.0" :> "storage-pools" :> Get '[JSON] (Response [PoolName])
+      :<|> "1.0" :> "storage-pools" :> ReqBody '[JSON] PoolCreateRequest :> Post '[JSON] (Response Value)
+      :<|> "1.0" :> "storage-pools" :> Capture "name" PoolName :> Get '[JSON] (Response Pool)
+      :<|> "1.0" :> "storage-pools" :> Capture "name" PoolName :> ReqBody '[JSON] PoolConfigRequest :> Put '[JSON] (Response Value)
+      :<|> "1.0" :> "storage-pools" :> Capture "name" PoolName :> ReqBody '[JSON] PoolConfigRequest :> Patch '[JSON] (Response Value)
+      :<|> "1.0" :> "storage-pools" :> Capture "name" PoolName :> Delete '[JSON] (Response Value)
       :<|> "1.0" :> "operations" :> Get '[JSON] (Response AllOperations)
       :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Get '[JSON] (Response Operation)
       :<|> "1.0" :> "operations" :> Capture "uuid" OperationId :> Delete '[JSON] (Response Value)
@@ -176,6 +190,12 @@ profile                              :: ProfileName -> ClientM (Response Profile
 profilePut                           :: ProfileName -> ProfileConfigRequest -> ClientM (Response Value)
 profilePatch                         :: ProfileName -> ProfileConfigRequest -> ClientM (Response Value)
 profileDelete                        :: ProfileName -> ClientM (Response Value)
+poolList                             :: ClientM (Response [PoolName])
+poolCreate                           :: PoolCreateRequest -> ClientM (Response Value)
+pool                                 :: PoolName -> ClientM (Response Pool)
+poolPut                              :: PoolName -> PoolConfigRequest -> ClientM (Response Value)
+poolPatch                            :: PoolName -> PoolConfigRequest -> ClientM (Response Value)
+poolDelete                           :: PoolName -> ClientM (Response Value)
 operationIds                         :: ClientM (Response AllOperations)
 operation                            :: OperationId -> ClientM (Response Operation)
 operationCancel                      :: OperationId -> ClientM (Response Value)
@@ -214,6 +234,12 @@ supportedVersions                        :<|>
     profilePut                           :<|>
     profilePatch                         :<|>
     profileDelete                        :<|>
+    poolList                             :<|>
+    poolCreate                           :<|>
+    pool                                 :<|>
+    poolPut                              :<|>
+    poolPatch                            :<|>
+    poolDelete                           :<|>
     operationIds                         :<|>
     operation                            :<|>
     operationCancel                      :<|>
