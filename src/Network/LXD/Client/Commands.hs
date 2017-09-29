@@ -71,6 +71,13 @@ module Network.LXD.Client.Commands (
 , lxcNetworkInfo
 , lxcNetworkConfig
 , lxcNetworkDelete
+
+  -- * Profiles
+, lxcProfileList
+, lxcProfileCreate
+, lxcProfileInfo
+, lxcProfileConfig
+, lxcProfileDelete
 ) where
 
 import Network.LXD.Prelude
@@ -523,6 +530,26 @@ lxcNetworkConfig n c = void . runClient $ networkPatch n c >>= checkResponseOK
 -- | Delete a network
 lxcNetworkDelete :: HasClient m => NetworkName -> m ()
 lxcNetworkDelete n = void . runClient $ networkDelete n >>= checkResponseOK
+
+-- | List all profiles
+lxcProfileList :: HasClient m => m [ProfileName]
+lxcProfileList = runClient $ profileList >>= checkResponseOK
+
+-- | Create a profile.
+lxcProfileCreate :: HasClient m => ProfileCreateRequest -> m ()
+lxcProfileCreate n = void . runClient $ profileCreate n >>= checkResponseOK
+
+-- | Get profile information.
+lxcProfileInfo :: HasClient m => ProfileName -> m Profile
+lxcProfileInfo n = runClient $ profile n >>= checkResponseOK
+
+-- | Configure a profile.
+lxcProfileConfig :: HasClient m => ProfileName -> ProfileConfigRequest -> m ()
+lxcProfileConfig n c = void . runClient $ profilePatch n c >>= checkResponseOK
+
+-- | Delete a profile
+lxcProfileDelete :: HasClient m => ProfileName -> m ()
+lxcProfileDelete n = void . runClient $ profileDelete n >>= checkResponseOK
 
 -- | Run a client operation.
 runClient :: HasClient m => ClientM a -> m a
