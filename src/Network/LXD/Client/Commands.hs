@@ -38,6 +38,8 @@ module Network.LXD.Client.Commands (
 , lxcExecRaw
 
   -- * Files and directories
+  -- ** Deletion
+, lxcFileDelete
   -- ** Files
 , lxcFilePull
 , lxcFilePullRaw
@@ -46,6 +48,7 @@ module Network.LXD.Client.Commands (
 , lxcFilePushRaw
 , lxcFilePushRawAttrs
   -- ** Directories
+, lxcFileListDir
 , lxcFileMkdir
 , lxcFileMkdirTemplate
 , lxcFileMkdirAttrs
@@ -288,6 +291,10 @@ lxcExecRaw name cmd args env stdin stdout stderr = do
     req = def { execRequestCommand = cmd:args
               , execRequestEnvironment = env }
 
+-- | Delete a file or empty directory from an LXD container.
+lxcFileDelete :: HasClient m => ContainerName -> FilePath -> m ()
+lxcFileDelete name fp = void . runClient $ containerDeletePath name fp
+
 -- | Pull the file contents from an LXD container.
 lxcFilePull :: HasClient m
             => ContainerName  -- ^ Container name
@@ -370,6 +377,14 @@ lxcFileMkdirTemplate :: HasClient m
 lxcFileMkdirTemplate name src dst = do
     mode <- liftIO $ fileMode <$> getFileStatus src
     lxcFileMkdirAttrs name dst False Nothing Nothing (Just $ convFileMode mode)
+
+-- | List all entries in a directory, without @.@ or @..@.
+lxcFileListDir :: HasClient m => ContainerName -> FilePath -> m [String]
+lxcFileListDir name fp = do
+    path <- runClient $ containerGetPath name fp
+    case getFile path of
+        File _ -> throwM $ ClientError "expected a directory, but got a file"
+        Directory r -> checkResponseOK r
 
 -- | Create a directory.
 lxcFileMkdir :: HasClient m

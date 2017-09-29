@@ -58,6 +58,16 @@ testSuite = describe "containers" $ do
         logOK $ "Contents of /etc/hostname: " ++ show out
         out `shouldNotBe` ""
 
+    it "should delete files and directories" $ do
+        out <- withContainer $ \name -> do
+            _ <- lxcExec name "/bin/mkdir" ["/tmp/hello_world_dir"] mempty
+            _ <- lxcExec name "/bin/touch" ["/tmp/hello_world_file"] mempty
+            lxcFileDelete name "/tmp/hello_world_dir"
+            lxcFileDelete name "/tmp/hello_world_file"
+            lxcFileListDir name "/tmp/"
+        out `shouldNotContain` ["hello_world_dir"]
+        out `shouldNotContain` ["hello_world_file"]
+
 
 randomContainerName :: IO ContainerName
 randomContainerName = ContainerName . T.unpack . ("lxd-test-suite-" <>) . UUID.toText <$> randomIO
