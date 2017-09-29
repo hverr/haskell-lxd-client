@@ -5,14 +5,8 @@
 module Network.LXD.Client.Commands (
   -- * Re-exports
   def
-  -- ** Remotes
 , module Network.LXD.Client.Remotes
-
-  -- ** Containers
-, containerCreateRequest
-, ContainerSource(..)
-  -- ** Images
-, remoteImage
+, module Network.LXD.Client.Types
 
   -- * Running commands
 , HasClient(..)
@@ -119,6 +113,7 @@ import System.Posix.Files (getFileStatus, fileMode, setFileMode)
 import qualified System.IO as IO
 
 import Network.LXD.Client
+import Network.LXD.Client.Types
 import Network.LXD.Client.Events
 import Network.LXD.Client.Remotes
 
