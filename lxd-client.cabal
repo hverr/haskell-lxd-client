@@ -41,6 +41,7 @@ library
                      , http-types
                      , mtl
                      , network
+                     , semigroups
                      , servant
                      , servant-client
                      , text
