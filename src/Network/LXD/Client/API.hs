@@ -123,6 +123,9 @@ import Servant.Client hiding (FailureResponse)
 import Web.HttpApiData (FromHttpApiData, ToHttpApiData, toHeader, parseHeader)
 
 import Network.LXD.Client.Types
+import Network.LXD.Client.Internal.Compatibility (compat)
+import qualified Network.LXD.Client.Internal.Compatibility.WebSockets as WSC
+
 
 type API = Get '[JSON] (Response [ApiVersion])
       :<|> "1.0" :> Get '[JSON] (Response ApiConfig)
@@ -362,11 +365,11 @@ operationWebSocket (OperationId oid) (Secret secret) =
 
 readAllWebSocket :: (ByteString -> IO ()) -> WS.ClientApp ()
 readAllWebSocket f con = do
-    m <- (Just <$> WS.receiveDataMessage con) `catch` handle'
-    case m of Nothing             -> return ()
-              Just (WS.Text _)    -> WS.sendClose con BL.empty
-              Just (WS.Binary bs) -> f bs
-                                  >> readAllWebSocket f con
+    m <- (Just . compat <$> WS.receiveDataMessage con) `catch` handle'
+    case m of Nothing              -> return ()
+              Just (WSC.Text _)    -> WS.sendClose con BL.empty
+              Just (WSC.Binary bs) -> f bs
+                                   >> readAllWebSocket f con
   where
     handle' (WS.CloseRequest _ _) = return Nothing
     handle' e                     = throwIO e

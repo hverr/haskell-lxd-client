@@ -18,6 +18,8 @@ import qualified Network.WebSockets as WS
 import Web.Internal.HttpApiData (ToHttpApiData(..))
 
 import Network.LXD.Client.Types
+import Network.LXD.Client.Internal.Compatibility (compat)
+import qualified Network.LXD.Client.Internal.Compatibility.WebSockets as WSC
 
 eventsPath :: [EventType] -> String
 eventsPath types = "/1.0/events?" ++ typesQuery
@@ -34,10 +36,10 @@ readAllEvents f con =
     go `finally` WS.sendClose con BL.empty
   where
     go = do
-        m <- (Just <$> WS.receiveDataMessage con) `catch` handle'
-        case m of Nothing            -> f Nothing
-                  Just (WS.Text t)   -> decodeMsg t >>= f . Just >> go
-                  Just (WS.Binary b) -> decodeMsg b >>= f . Just >> go
+        m <- (Just . compat <$> WS.receiveDataMessage con) `catch` handle'
+        case m of Nothing             -> f Nothing
+                  Just (WSC.Text t)   -> decodeMsg t >>= f . Just >> go
+                  Just (WSC.Binary b) -> decodeMsg b >>= f . Just >> go
 
     handle' (WS.CloseRequest _ _) = return Nothing
     handle' e                     = throwIO e
