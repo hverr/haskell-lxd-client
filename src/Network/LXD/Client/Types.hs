@@ -30,6 +30,7 @@ module Network.LXD.Client.Types (
 , ApiStatus(..)
 , AuthStatus(..)
 , ApiVersion(..)
+, ApiExtension(..)
 
   -- * Certificates
 , CertificateHash(..)
@@ -221,7 +222,7 @@ instance FromJSON m => FromJSON (BackgroundOperation m) where
 -- Returend when querying @GET \/1.0@. Some objects may not be present if
 -- an untrusted requeset was made.
 data ApiConfig = ApiConfig {
-    apiExtensions :: [String]
+    apiExtensions :: [ApiExtension]
   , apiStatus :: ApiStatus
   , apiVersion :: String
   , authStatus :: AuthStatus
@@ -239,6 +240,45 @@ instance FromJSON ApiConfig where
         <*> v .:? "config"
         <*> v .:? "environment"
         <*> v .: "public"
+
+-- | LXD API extension identifier.
+data ApiExtension = ExtPatch
+                  | ExtCertificateUpdate
+                  | ExtContainerExecRecording
+                  | ExtFileAppend
+                  | ExtFileDelete
+                  | ExtContainerEditMetadata
+                  | ExtImageCreateAliases
+                  | ExtNetwork
+                  | ExtStorage
+                  | ExtOther String
+                  deriving (Eq, Ord, Show)
+
+instance FromJSON ApiExtension where
+    parseJSON v = apiExtensionFromString <$> parseJSON v
+
+instance ToJSON ApiExtension where
+    toJSON = toJSON . apiExtensionToString
+
+apiExtensionMap :: Bimap String ApiExtension
+apiExtensionMap = Bimap.fromList [
+    ("patch"                   , ExtPatch)
+  , ("certificate_update"      , ExtCertificateUpdate)
+  , ("container_exec_recording", ExtContainerExecRecording)
+  , ("file_append"             , ExtFileAppend)
+  , ("file_delete"             , ExtFileDelete)
+  , ("container_edit_metadata" , ExtContainerEditMetadata)
+  , ("image_create_aliases"    , ExtImageCreateAliases)
+  , ("network"                 , ExtNetwork)
+  , ("storage"                 , ExtStorage)
+  ]
+
+apiExtensionFromString :: String -> ApiExtension
+apiExtensionFromString v = fromMaybe (ExtOther v) $ Bimap.lookup v apiExtensionMap
+
+apiExtensionToString :: ApiExtension -> String
+apiExtensionToString (ExtOther v) = v
+apiExtensionToString c = fromMaybe (P.error $ "unindexed api extension: " ++ show c) $ Bimap.lookupR c apiExtensionMap
 
 -- | LXD trusted certificate hash.
 newtype CertificateHash = CertificateHash String deriving (Eq, Show)

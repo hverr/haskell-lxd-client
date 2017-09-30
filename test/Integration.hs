@@ -16,7 +16,7 @@ import System.Random (randomIO)
 import Test.Hspec
 import Turtle (sh, procs, empty)
 
-import Network.LXD.Client.Commands
+import Network.LXD.Client.Commands hiding (containerName)
 
 main :: IO ()
 main = do
@@ -58,13 +58,13 @@ testSuite = describe "containers" $ do
         logOK $ "Contents of /etc/hostname: " ++ show out
         out `shouldNotBe` ""
 
-    it "should delete files and directories" $ do
+    it "should delete files and directories" $ withExts [ExtFileDelete] $ do
         out <- withContainer $ \name -> do
-            _ <- lxcExec name "/bin/mkdir" ["/tmp/hello_world_dir"] mempty
-            _ <- lxcExec name "/bin/touch" ["/tmp/hello_world_file"] mempty
-            lxcFileDelete name "/tmp/hello_world_dir"
-            lxcFileDelete name "/tmp/hello_world_file"
-            lxcFileListDir name "/tmp/"
+            _ <- lxcExec name "/bin/mkdir" ["/hello_world_dir"] mempty
+            _ <- lxcExec name "/bin/touch" ["/hello_world_file"] mempty
+            lxcFileDelete name "/hello_world_dir"
+            lxcFileDelete name "/hello_world_file"
+            lxcFileListDir name "/"
         out `shouldNotContain` ["hello_world_dir"]
         out `shouldNotContain` ["hello_world_file"]
 
@@ -82,6 +82,13 @@ withContainer action = do
         (logOK ("Creating " ++ show name) >> create >> lxcStart name)
         (logOK "Stopping" >> lxcStop name True >> lxcDelete name)
         (action name)
+
+withExts :: [ApiExtension] -> IO () -> IO ()
+withExts exts action = do
+    avail <- apiExtensions <$> runWithLocalHost def lxcApi
+    if all (`elem` avail) exts
+    then action
+    else logErr $ "Could not test: not all extensions available: " ++ show exts
 
 --------------------------------------------------------------------------------
 
