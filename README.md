@@ -17,4 +17,4 @@ LXD is a container manager offering users a similar experience to virtual machin
 Documentation and examples can be found in [haddock of the `Network.LXD.Client.Commands` module](https://hackage.haskell.org/package/lxd-client/docs/Network-LXD-Client-Commands.html).
 
 ## Other resources
-TODO
+Accompanying blog post: https://deliquus.com/posts/2017-10-02-using-servant-to-orchestrate-lxd-containers.md
