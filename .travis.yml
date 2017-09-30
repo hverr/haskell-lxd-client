@@ -135,7 +135,7 @@ script:
         cabal install --enable-tests --enable-benchmarks --force-reinstalls --ghc-options=-O0 --reorder-goals --max-backjumps=-1 $CABALARGS $PACKAGES
       else
         cabal install --enable-tests --enable-coverage --enable-benchmarks --force-reinstalls --ghc-options=-O0 --reorder-goals --max-backjumps=-1 $CABALARGS $PACKAGES
-        sudo su travis -c 'LOCAL=yes PATH=$PATH cabal test'
+        sudo su travis -c "LOCAL=yes PATH=$PATH cabal test"
         cabal install hpc-coveralls
         hpc-coveralls -r "$COVERALLS_TOKEN" lxd-client-integration
       fi
