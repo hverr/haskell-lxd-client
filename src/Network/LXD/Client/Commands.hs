@@ -12,41 +12,13 @@
 -- "Network.LXD.Client.API", but unless you are a power user, you
 -- shouldn't need this module.
 --
--- All commands take place in the 'HasClient' monad. The 'WithLocalHost'
--- and 'WithRemoteHost' monads can be used directly for fast access to
--- an LXD daemon, but you can also make your own monad stack an instance
--- of 'HasClient'.
---
--- You can connect to an LXD daemon over a unix-socket on the local
--- host, or over HTTPS. For more information about these connection
--- types see "Network.LXD.Client".
---
--- An example using these command to conncet to the LXD instance on your
--- local host (should work out of the box).
---
--- > {-# LANGUAGE OverloadedStrings #-}
--- > module Main where
--- >
--- > import Control.Monad.IO.Class (liftIO)
--- > import Network.LXD.Client.Commands
--- >
--- > main :: IO ()
--- > main = runWithLocalHost def $ do
--- >     liftIO $ putStrLn "Creating my-container"
--- >     lxcCreate . containerCreateRequest "my-container"
--- >               . ContainerSourceRemote
--- >               $ remoteImage imagesRemote "ubuntu/xenial/amd64"
--- >
--- >     liftIO $ putStrLn "Starting my-container"
--- >     lxcStart "my-container"
--- >
--- >     liftIO $ putStrLn "Stopping my-container"
--- >     lxcStop "my-container" False
--- >
--- >     liftIO $ putStrLn "Deleting my-container"
--- >     lxcDelete "my-container"
+-- Accompanying blog post:
+-- <https://deliquus.com/posts/2017-10-02-using-servant-to-orchestrate-lxd-containers.md>
 --
 module Network.LXD.Client.Commands (
+  -- * How to use this library
+  -- $use
+
   -- * Re-exports
   def
 , module Network.LXD.Client.Remotes
@@ -744,3 +716,40 @@ instance Show OperationError where
     show (OperationError err) = "Operation unsuccessful: " ++ err
 
 instance Exception OperationError where
+
+-- $use
+--
+-- All commands take place in the 'HasClient' monad. The 'WithLocalHost'
+-- and 'WithRemoteHost' monads can be used directly for fast access to
+-- an LXD daemon, but you can also make your own monad stack an instance
+-- of 'HasClient'.
+--
+-- You can connect to an LXD daemon over a unix-socket on the local
+-- host, or over HTTPS. For more information about these connection
+-- types see "Network.LXD.Client".
+--
+-- An example using these command to conncet to the LXD instance on your
+-- local host (should work out of the box).
+--
+-- > {-# LANGUAGE OverloadedStrings #-}
+-- > module Main where
+-- >
+-- > import Control.Monad.IO.Class (liftIO)
+-- > import Network.LXD.Client.Commands
+-- >
+-- > main :: IO ()
+-- > main = runWithLocalHost def $ do
+-- >     liftIO $ putStrLn "Creating my-container"
+-- >     lxcCreate . containerCreateRequest "my-container"
+-- >               . ContainerSourceRemote
+-- >               $ remoteImage imagesRemote "ubuntu/xenial/amd64"
+-- >
+-- >     liftIO $ putStrLn "Starting my-container"
+-- >     lxcStart "my-container"
+-- >
+-- >     liftIO $ putStrLn "Stopping my-container"
+-- >     lxcStop "my-container" False
+-- >
+-- >     liftIO $ putStrLn "Deleting my-container"
+-- >     lxcDelete "my-container"
+--

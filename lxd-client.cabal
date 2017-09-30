@@ -3,6 +3,15 @@ version:             0.1.0.0
 synopsis:            LXD client written in Haskell.
 description:
     Implementation of the LXD client protocol in Haskell.
+    .
+    This module implements the LXD client protocol in Haskell using servant and
+    websockets. It allows you to manage LXD containers and other resources
+    directly from Haskell.
+    .
+    More information and a tutorial is in "Network.LXD.Client.Commands".
+    .
+    Accompanying blog post:
+    <https://deliquus.com/posts/2017-10-02-using-servant-to-orchestrate-lxd-containers.md>
 homepage:            https://github.com/hverr/haskell-lxd-client#readme
 license:             GPL-3
 license-file:        LICENSE
