@@ -29,6 +29,8 @@ library
                      , Network.LXD.Client.API
                      , Network.LXD.Client.Commands
                      , Network.LXD.Client.Events
+                     , Network.LXD.Client.Internal.Compatibility
+                     , Network.LXD.Client.Internal.Compatibility.WebSockets
                      , Network.LXD.Client.Internal.Prelude
                      , Network.LXD.Client.Remotes
                      , Network.LXD.Client.Types
@@ -58,7 +60,7 @@ library
                      , tls              >= 1.3.9 && <2
                      , transformers     >= 0.5.2.0 && <1
                      , unix             >= 2.7.0.1 && <3
-                     , websockets       >= 0.10.0.0 && <0.11
+                     , websockets       >= 0.10.0.0 && <0.11 || >= 0.12.2.0 && <0.13
                      , x509             >= 1.6.5 && <2
                      , x509-store       >= 1.6.2 && <2
                      , x509-validation  >= 1.6.5 && <2

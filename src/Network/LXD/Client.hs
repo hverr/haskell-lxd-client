@@ -63,7 +63,7 @@ import Network.TLS (ClientHooks(onCertificateRequest, onServerCertificate),
                     Supported(supportedCiphers),
                     credentialLoadX509,
                     defaultParamsClient)
-import Network.TLS.Extra.Cipher (ciphersuite_all)
+import Network.TLS.Extra.Cipher (ciphersuite_default)
 import qualified Network.Connection as Con
 import qualified Network.Socket as Socket
 import qualified Network.WebSockets as WS
@@ -171,7 +171,7 @@ clientTlsSettings' host creds caStore =
     clientParams = (defaultParamsClient host "")
                    { clientShared = shared
                    , clientHooks  = hooks
-                   , clientSupported = def { supportedCiphers = ciphersuite_all }
+                   , clientSupported = def { supportedCiphers = ciphersuite_default }
                    }
     shared | Just store <- caStore = def { sharedCAStore = store }
            | otherwise             = def
