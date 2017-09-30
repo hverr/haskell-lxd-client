@@ -59,6 +59,8 @@ module Network.LXD.Client.Commands (
 , WithLocalHost, runWithLocalHost
 , WithRemoteHost, runWithRemoteHost
 
+  -- * API
+, lxcApi
   -- * Containers
 , lxcList
 , lxcCreate
@@ -235,6 +237,10 @@ instance HasClient WithRemoteHost where
 -- | Run a 'WithRemoteHost' monad
 runWithRemoteHost :: RemoteHost -> WithRemoteHost a -> IO a
 runWithRemoteHost host (WithRemoteHost m) = evalStateT m (host, Nothing)
+
+-- | Get information about the API.
+lxcApi :: HasClient m => m ApiConfig
+lxcApi = runClient $ apiConfig >>= checkResponseOK
 
 -- | List all container names.
 lxcList :: HasClient m => m [ContainerName]
