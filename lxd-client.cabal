@@ -11,7 +11,7 @@ description:
     More information and a tutorial is in "Network.LXD.Client.Commands".
     .
     Accompanying blog post:
-    <https://deliquus.com/posts/2017-10-02-using-servant-to-orchestrate-lxd-containers.md>
+    <https://deliquus.com/posts/2017-10-02-using-servant-to-orchestrate-lxd-containers.html>
 homepage:            https://github.com/hverr/haskell-lxd-client#readme
 license:             GPL-3
 license-file:        LICENSE

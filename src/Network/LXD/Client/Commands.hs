@@ -13,7 +13,7 @@
 -- shouldn't need this module.
 --
 -- Accompanying blog post:
--- <https://deliquus.com/posts/2017-10-02-using-servant-to-orchestrate-lxd-containers.md>
+-- <https://deliquus.com/posts/2017-10-02-using-servant-to-orchestrate-lxd-containers.html>
 --
 module Network.LXD.Client.Commands (
   -- * How to use this library
