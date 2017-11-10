@@ -1,5 +1,5 @@
 name:                lxd-client
-version:             0.1.0.2
+version:             0.1.0.3
 synopsis:            LXD client written in Haskell.
 description:
     Implementation of the LXD client protocol in Haskell.
