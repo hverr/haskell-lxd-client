@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
@@ -118,7 +119,12 @@ import qualified Network.HTTP.Types.Status as HTTP
 import qualified Network.WebSockets as WS
 
 import Servant.API
+
+#if MIN_VERSION_servant(0, 12, 0)
 import Servant.Client hiding (Response, FailureResponse)
+#else
+import Servant.Client hiding (FailureResponse)
+#endif
 
 import Web.HttpApiData (FromHttpApiData, ToHttpApiData, toHeader, parseHeader)
 
