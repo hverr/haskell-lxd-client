@@ -118,7 +118,7 @@ import qualified Network.HTTP.Types.Status as HTTP
 import qualified Network.WebSockets as WS
 
 import Servant.API
-import Servant.Client hiding (FailureResponse)
+import Servant.Client hiding (Response, FailureResponse)
 
 import Web.HttpApiData (FromHttpApiData, ToHttpApiData, toHeader, parseHeader)
 

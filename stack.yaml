@@ -1,6 +1,9 @@
 resolver: lts-9.6
 packages:
 - '.'
-extra-deps: []
+extra-deps:
+- servant-0.12
+- servant-client-0.12
+- servant-client-core-0.12
 flags: {}
 extra-package-dbs: []
