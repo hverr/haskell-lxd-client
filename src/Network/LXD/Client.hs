@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 -- | This module exposes functionality to create LXD clients. These can
@@ -69,7 +70,11 @@ import qualified Network.Socket as Socket
 import qualified Network.WebSockets as WS
 import qualified Network.WebSockets.Stream as WS
 
+#if MIN_VERSION_servant(0, 13, 0)
+import Servant.Client (BaseUrl(..), ClientEnv(..), mkClientEnv, Scheme(Http, Https))
+#else
 import Servant.Client (BaseUrl(..), ClientEnv(..), Scheme(Http, Https))
+#endif
 
 import System.Directory (getHomeDirectory)
 import System.IO.Error (catchIOError, isEOFError)
@@ -133,7 +138,7 @@ remoteHostManager RemoteHost{..} = clientManager remoteHostHost
 
 remoteHostClient :: (MonadError String m, MonadIO m) => RemoteHost -> m ClientEnv
 remoteHostClient remote@RemoteHost{..} =
-    ClientEnv <$> remoteHostManager remote <*> pure baseUrl
+    mkClientEnv <$> remoteHostManager remote <*> pure baseUrl
   where
     baseUrl = BaseUrl Https remoteHostHost remoteHostPort remoteHostBasePath
 
@@ -189,7 +194,7 @@ clientConnectionParams RemoteHost{..} = do
 localHostClient :: MonadIO m => LocalHost -> m ClientEnv
 localHostClient host = do
     m <- liftIO $ newManager defaultManagerSettings { managerRawConnection = createUnixConnection }
-    return $ ClientEnv m baseUrl
+    return $ mkClientEnv m baseUrl
   where
     createUnixConnection = return $ \_ _ _ -> do
         s <- unixSocket host
@@ -254,3 +259,8 @@ expandHomeDirectory x            = return x
 eitherToError :: MonadError err m => Either err a -> m a
 eitherToError (Left  x) = throwError x
 eitherToError (Right x) = return x
+
+#if !MIN_VERSION_servant(0, 13, 0)
+mkClientEnv :: Manager -> BaseUrl -> ClientEnv
+mkClientEnv = ClientEnv
+#endif
