@@ -434,7 +434,21 @@ newtype DecodeError = DecodeError String deriving (Show)
 instance Exception DecodeError where
 
 askBaseUrl :: ClientM BaseUrl
-askBaseUrl = asks $ \(ClientEnv _ url) -> url
+askBaseUrl = asks getBaseUrl
+  where
+    getBaseUrl :: ClientEnv -> BaseUrl
+#if MIN_VERSION_servant(0, 12, 0)
+    getBaseUrl = baseUrl
+#else
+    getBaseUrl (ClientEnv _ url) = url
+#endif
 
 askManager :: ClientM Client.Manager
-askManager = asks $ \(ClientEnv mgr _) -> mgr
+askManager = asks getManager
+  where
+    getManager :: ClientEnv -> Client.Manager
+#if MIN_VERSION_servant(0, 12, 0)
+    getManager = manager
+#else
+    getManager (ClientEnv mgr _) = mgr
+#endif
