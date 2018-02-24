@@ -595,7 +595,8 @@ instance ToJSON ContainerSource where
       , "mode" .= ("pull" :: String)
       , "server" .= remoteImageServer
       ] ++ catMaybes [
-        (.=) <$> pure "secret" <*> remoteImageSecret
+        (.=) <$> pure "protocol" <*> remoteImageProtocol
+      , (.=) <$> pure "secret" <*> remoteImageSecret
       , (.=) <$> pure "certificate" <*> remoteImageCertificate
       , (.=) <$> pure "alias" <*> remoteImageAlias
       , (.=) <$> pure "fingerprint" <*> remoteImageFingerprint
@@ -618,6 +619,7 @@ data RemoteImage = RemoteImage {
     remoteImageServer :: String
   , remoteImageSecret :: Maybe String
   , remoteImageCertificate :: Maybe String
+  , remoteImageProtocol :: Maybe String
   , remoteImageAliasOrFingerprint :: Either ImageAliasName ImageId
   } deriving (Show)
 
@@ -627,6 +629,7 @@ remoteImage server alias = RemoteImage {
     remoteImageServer = server
   , remoteImageSecret = Nothing
   , remoteImageCertificate = Nothing
+  , remoteImageProtocol = Nothing
   , remoteImageAliasOrFingerprint = Left alias }
 
 -- | Create a remote image reference form a public remote, using an image ID.
@@ -635,6 +638,7 @@ remoteImageId server img = RemoteImage {
     remoteImageServer = server
   , remoteImageSecret = Nothing
   , remoteImageCertificate = Nothing
+  , remoteImageProtocol = Nothing
   , remoteImageAliasOrFingerprint = Right img }
 
 -- | LXD delete container request object.
