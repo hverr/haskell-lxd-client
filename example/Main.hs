@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
+import Prelude
+
 import Control.Monad.IO.Class (liftIO)
 import Network.LXD.Client.Commands
 
