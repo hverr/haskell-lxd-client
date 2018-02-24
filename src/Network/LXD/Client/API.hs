@@ -349,7 +349,8 @@ containerPostPath name fp uid gid perm ftype mode body = do
                          , hdr "X-LXD-Mode" <$> perm
                          , hdr "X-LXD-Type" <$> Just ftype
                          , hdr "X-LXD-Write" . mode' <$> mode ]
-    let req' = req { Client.requestHeaders = hdrs
+    let req' = req { Client.method = "POST"
+                   , Client.requestHeaders = hdrs
                    , Client.requestBody = Client.RequestBodyLBS body }
 
     performJsonRequest req'

@@ -455,13 +455,14 @@ lxcFileMkdirAttrs name dir True uid gid fm =
     mapM_ mkdir $ inits (splitPath dir)
   where
     mkdir xs = case concat xs of
+        ""  -> return ()
         "/" -> return ()
         path -> do
             pathInfo <- runClient $ (Just <$> containerGetPath name path) `catch` ignoreExc
             case getFile <$> pathInfo of
-                Just (File _) -> throwM $ ClientError $ "couldn't make dir " ++ dir ++ ": " ++ path ++ " is not a directory"
+                Just (File _) -> throwM $ ClientError $ "couldn't make dir " ++ path ++ ": " ++ path ++ " is not a directory"
                 Just (Directory _) -> return ()
-                Nothing -> lxcFileMkdirAttrs name dir False uid gid fm
+                Nothing -> lxcFileMkdirAttrs name path False uid gid fm
 
     ignoreExc :: Monad m => SomeException -> m (Maybe a)
     ignoreExc _ = return Nothing
